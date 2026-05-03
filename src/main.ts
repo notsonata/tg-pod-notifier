@@ -41,6 +41,11 @@ async function main() {
 
   await bot.init();
   await server.listen({ host: "0.0.0.0", port: config.PORT });
+  void bot.start({
+    onStart: () => {
+      console.log("Telegram bot polling started.");
+    }
+  });
 }
 
 main().catch((error) => {
