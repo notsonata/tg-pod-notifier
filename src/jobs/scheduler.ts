@@ -7,30 +7,10 @@ import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 import { GelatoClient } from "../providers/gelato.js";
 import { PrintifyClient } from "../providers/printify.js";
 import { shouldSendDigest } from "./digest.js";
+import { refreshAllOrders } from "./sync.js";
 import { sendDigest, sendOrderAlert } from "../telegram/bot.js";
 
-async function refreshPrintifyOrders(printify: PrintifyClient, repository: Repository) {
-  const shopId = await repository.getSelectedPrintifyShopId();
-  if (!shopId) {
-    return;
-  }
-  const orders = await printify.listOrders(shopId);
-  for (const order of orders) {
-    await repository.upsertOrder(order, "poll");
-  }
-}
-
-async function refreshGelatoOrders(gelato: GelatoClient, repository: Repository) {
-  const knownOrders = await repository.listKnownGelatoOrders();
-  for (const order of knownOrders) {
-    const refreshed = order.referenceOrderId
-      ? await gelato.getOrderStatus(order.referenceOrderId)
-      : await gelato.getOrder(order.externalOrderId);
-    await repository.upsertOrder(refreshed, "poll");
-  }
-}
-
-async function scanAlerts(
+export async function runAlertScan(
   repository: Repository,
   bot: Bot,
   settings: BotSettings
@@ -39,15 +19,19 @@ async function scanAlerts(
   for (const order of openOrders) {
     const alert = evaluateOrderAlert(order, {
       nowIso: new Date().toISOString(),
-      preProductionHours: settings.thresholds.preProductionHours,
-      holdHours: settings.thresholds.holdHours,
-      productionBusinessDays: settings.thresholds.productionBusinessDays
+      staleDays: settings.thresholds.staleDays
     });
 
     if (alert) {
       const shouldSend = await repository.upsertAlert(order, alert);
       if (shouldSend) {
-        await sendOrderAlert(bot, settings.telegramChatId, order, settings);
+        await sendOrderAlert(
+          bot,
+          settings.telegramChatId,
+          order,
+          settings,
+          alert.reason === "delayed-order" ? "delayed" : "stale"
+        );
       }
     }
   }
@@ -63,10 +47,13 @@ export function startScheduler(deps: {
   const { repository, bot, settings, printify, gelato } = deps;
 
   cron.schedule("*/30 * * * *", async () => {
-    await refreshPrintifyOrders(printify, repository);
-    await refreshGelatoOrders(gelato, repository);
+    await refreshAllOrders({
+      repository,
+      printify,
+      gelato
+    });
     const currentSettings = await repository.ensureSettings();
-    await scanAlerts(repository, bot, currentSettings);
+    await runAlertScan(repository, bot, currentSettings);
   });
 
   cron.schedule("* * * * *", async () => {

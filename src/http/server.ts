@@ -40,9 +40,12 @@ export function createServer(deps: {
       return reply.status(202).send({ ok: true, skipped: "printify-shop-not-selected" });
     }
     const refreshed = await printify.getOrder(shopId, event.orderId);
+    const existing = await repository.getOrder("printify", refreshed.externalOrderId);
     await repository.upsertOrder(refreshed, "webhook");
     const settings = await repository.ensureSettings();
-    await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings);
+    if (!existing) {
+      await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "new");
+    }
     return reply.status(202).send({ ok: true });
   });
 
@@ -62,9 +65,27 @@ export function createServer(deps: {
     const refreshed = event.referenceOrderId
       ? await gelato.getOrderStatus(event.referenceOrderId)
       : await gelato.getOrder(event.orderId);
-    await repository.upsertOrder(refreshed, "webhook");
+    const existing = await repository.getOrder("gelato", refreshed.externalOrderId);
+    const deliveryEstimate = payload as {
+      minDeliveryDate?: string;
+      maxDeliveryDate?: string;
+    };
+    await repository.upsertOrder(
+      {
+        ...refreshed,
+        etaMinAt: deliveryEstimate.minDeliveryDate
+          ? new Date(deliveryEstimate.minDeliveryDate).toISOString()
+          : refreshed.etaMinAt,
+        etaMaxAt: deliveryEstimate.maxDeliveryDate
+          ? new Date(deliveryEstimate.maxDeliveryDate).toISOString()
+          : refreshed.etaMaxAt
+      },
+      "webhook"
+    );
     const settings = await repository.ensureSettings();
-    await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings);
+    if (!existing) {
+      await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "new");
+    }
     return reply.status(202).send({ ok: true });
   });
 

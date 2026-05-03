@@ -43,8 +43,14 @@ interface GelatoWebhookPayload {
   orderId: string;
   orderReferenceId: string;
   fulfillmentStatus?: string;
+  status?: string;
   comment?: string;
   itemReferenceId?: string;
+  trackingCode?: string;
+  trackingUrl?: string;
+  minDeliveryDate?: string;
+  maxDeliveryDate?: string;
+  created?: string;
   items?: Array<{
     itemReferenceId?: string;
     fulfillmentStatus?: string;
@@ -112,8 +118,8 @@ export function normalizeGelatoWebhook(payload: GelatoWebhookPayload): Normalize
     eventId: payload.id,
     orderId: payload.orderId,
     referenceOrderId: payload.orderReferenceId,
-    status: payload.fulfillmentStatus ?? "created",
-    occurredAt: null,
+    status: payload.fulfillmentStatus ?? payload.status ?? payload.event,
+    occurredAt: asIso(payload.created),
     comment: payload.comment ?? null,
     raw: payload
   };

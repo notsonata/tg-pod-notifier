@@ -58,19 +58,12 @@ export interface NormalizedOrderEvent {
 
 export interface AlertThresholds {
   nowIso: string;
-  preProductionHours: number;
-  holdHours: number;
-  productionBusinessDays: number;
+  staleDays: number;
 }
 
 export interface AlertDecision {
   severity: AlertSeverity;
-  reason:
-    | "provider-error"
-    | "pre-production-stale"
-    | "hold-stale"
-    | "production-stale"
-    | "eta-exceeded";
+  reason: "stale-order" | "delayed-order";
   message: string;
 }
 
@@ -88,9 +81,7 @@ export interface BotSettings {
   piiPhone: boolean;
   piiAddress: boolean;
   thresholds: {
-    preProductionHours: number;
-    holdHours: number;
-    productionBusinessDays: number;
+    staleDays: number;
   };
   lastDigestSentAt: string | null;
 }

@@ -18,12 +18,10 @@ export function orderKeyboard(order: NormalizedOrder): InlineKeyboard {
     .text("Refresh Now", `order:refresh:${order.provider}:${order.externalOrderId}`)
     .row()
     .text("Acknowledge", `order:ack:${order.provider}:${order.externalOrderId}`)
-    .text("Snooze 6h", `order:snooze:${order.provider}:${order.externalOrderId}:6`)
-    .row()
-    .text("Provider Link", `noop:provider`);
+    .text("Snooze 6h", `order:snooze:${order.provider}:${order.externalOrderId}:6`);
 
   if (order.providerUrl) {
-    keyboard.url("Open Provider", order.providerUrl);
+    keyboard.row().url("Open Provider", order.providerUrl);
   }
 
   return keyboard;
@@ -59,7 +57,9 @@ export function generalSettingsKeyboard(settings: BotSettings): InlineKeyboard {
         ? `Printify Shop ${settings.printifyShopId}`
         : "Select Printify Shop",
       "settings:printify"
-    );
+    )
+    .row()
+    .text(`Stale ${settings.thresholds.staleDays}d`, "settings:stale-days");
 }
 
 export function printifyShopsKeyboard(

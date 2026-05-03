@@ -20,9 +20,7 @@ describe("shouldSendDigest", () => {
           piiPhone: false,
           piiAddress: false,
           thresholds: {
-            preProductionHours: 2,
-            holdHours: 24,
-            productionBusinessDays: 3
+            staleDays: 3
           },
           lastDigestSentAt: null
         },
@@ -48,9 +46,7 @@ describe("shouldSendDigest", () => {
           piiPhone: false,
           piiAddress: false,
           thresholds: {
-            preProductionHours: 2,
-            holdHours: 24,
-            productionBusinessDays: 3
+            staleDays: 3
           },
           lastDigestSentAt: "2025-01-01T01:00:00.000Z"
         },

@@ -84,9 +84,7 @@ export function createDatabase(databasePath: string) {
       pii_email INTEGER NOT NULL DEFAULT 0,
       pii_phone INTEGER NOT NULL DEFAULT 0,
       pii_address INTEGER NOT NULL DEFAULT 0,
-      pre_production_hours INTEGER NOT NULL DEFAULT 2,
-      hold_hours INTEGER NOT NULL DEFAULT 24,
-      production_business_days INTEGER NOT NULL DEFAULT 3,
+      stale_days INTEGER NOT NULL DEFAULT 3,
       last_digest_sent_at TEXT
     );
     CREATE TABLE IF NOT EXISTS webhook_events (
@@ -100,6 +98,14 @@ export function createDatabase(databasePath: string) {
 
   try {
     sqlite.exec(`ALTER TABLE settings ADD COLUMN printify_shop_id TEXT;`);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
+      throw error;
+    }
+  }
+
+  try {
+    sqlite.exec(`ALTER TABLE settings ADD COLUMN stale_days INTEGER NOT NULL DEFAULT 3;`);
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
       throw error;

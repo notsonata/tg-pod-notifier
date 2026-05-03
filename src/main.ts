@@ -2,7 +2,8 @@ import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/client.js";
 import { Repository } from "./db/repository.js";
 import { createServer } from "./http/server.js";
-import { startScheduler } from "./jobs/scheduler.js";
+import { runAlertScan, startScheduler } from "./jobs/scheduler.js";
+import { refreshAllOrders } from "./jobs/sync.js";
 import { GelatoClient } from "./providers/gelato.js";
 import { PrintifyClient } from "./providers/printify.js";
 import { createTelegramBot } from "./telegram/bot.js";
@@ -41,6 +42,12 @@ async function main() {
 
   await bot.init();
   await server.listen({ host: "0.0.0.0", port: config.PORT });
+  await refreshAllOrders({
+    repository,
+    printify,
+    gelato
+  });
+  await runAlertScan(repository, bot, await repository.ensureSettings());
   void bot.start({
     onStart: () => {
       console.log("Telegram bot polling started.");

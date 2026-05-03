@@ -6,6 +6,8 @@ import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 import { GelatoClient } from "../providers/gelato.js";
 import { PrintifyClient } from "../providers/printify.js";
 import { Repository } from "../db/repository.js";
+import { refreshAllOrders } from "../jobs/sync.js";
+import { runAlertScan } from "../jobs/scheduler.js";
 import { isAuthorizedGroupChat } from "./access-control.js";
 import {
   digestSettingsKeyboard,
@@ -15,7 +17,12 @@ import {
   printifyShopsKeyboard,
   privacySettingsKeyboard
 } from "./keyboards.js";
-import { renderDigest, renderOrderDetails, renderOrderSummary } from "./render.js";
+import {
+  renderDigest,
+  renderOrderDetails,
+  renderOrderSummary,
+  type OrderAlertKind
+} from "./render.js";
 
 type AppContext = Context;
 
@@ -35,6 +42,16 @@ export function createTelegramBot(deps: {
 }) {
   const { config, repository, printify, gelato } = deps;
   const bot = new Bot<AppContext>(config.TELEGRAM_BOT_TOKEN);
+
+  void bot.api.setMyCommands([
+    { command: "start", description: "Activate the bot in this group" },
+    { command: "help", description: "Show available commands" },
+    { command: "orders", description: "List active tracked orders" },
+    { command: "refresh", description: "Refresh provider order data now" },
+    { command: "digest", description: "View digest settings" },
+    { command: "settings", description: "Open bot settings" },
+    { command: "privacy", description: "Configure order detail visibility" }
+  ]);
 
   bot.use(async (ctx, next) => {
     const chatId = ctx.chat?.id ?? ctx.callbackQuery?.message?.chat.id;
@@ -61,6 +78,38 @@ export function createTelegramBot(deps: {
         reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
       }
     );
+  });
+
+  bot.command("refresh", async (ctx) => {
+    const summary = await refreshAllOrders({
+      repository,
+      printify,
+      gelato
+    });
+    const settings = await repository.ensureSettings();
+    await runAlertScan(repository, bot, settings);
+    const openOrders = await repository.listOpenOrders();
+    const alerts = await repository.listActiveAlerts();
+    const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
+
+    await ctx.reply(
+      [
+        "Refresh complete.",
+        `Printify shop selected: ${summary.printifyShopSelected ? "yes" : "no"}`,
+        `Printify orders refreshed: ${summary.printifyOrders}`,
+        `Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
+        `Active tracked orders: ${openOrders.length}`,
+        summary.gelatoOrders === 0
+          ? "Gelato note: active order discovery depends on incoming webhooks or previously known order IDs."
+          : null
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      {
+        reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
+      }
+    );
+    await ctx.reply(renderDigest(openOrders, alerts, changes));
   });
 
   bot.command("digest", async (ctx) => {
@@ -164,6 +213,28 @@ export function createTelegramBot(deps: {
     });
   });
 
+  bot.callbackQuery(/^settings:stale-days$/, async (ctx) => {
+    const current = await repository.ensureSettings();
+    const nextDays = current.thresholds.staleDays === 1
+      ? 3
+      : current.thresholds.staleDays === 3
+        ? 5
+        : current.thresholds.staleDays === 5
+          ? 7
+          : 1;
+    const updated = await repository.updateSettings({
+      thresholds: {
+        staleDays: nextDays
+      }
+    });
+    await ctx.editMessageText(`Settings`, {
+      reply_markup: generalSettingsKeyboard(updated)
+    });
+    await ctx.answerCallbackQuery({
+      text: `Stale threshold set to ${nextDays} day(s).`
+    });
+  });
+
   bot.callbackQuery(/^settings:digest:toggle$/, async (ctx) => {
     const current = await repository.ensureSettings();
     const updated = await repository.updateSettings({
@@ -235,16 +306,21 @@ export function createTelegramBot(deps: {
     });
   });
 
+  bot.callbackQuery(/^noop:provider$/, async (ctx) => {
+    await ctx.answerCallbackQuery({
+      text: "Provider link is not available for this order."
+    });
+  });
+
   bot.callbackQuery(/^orders:refresh$/, async (ctx) => {
-    const shopId = await repository.getSelectedPrintifyShopId();
-    if (shopId) {
-      const printifyOrders = await printify.listOrders(shopId);
-      for (const order of printifyOrders) {
-        await repository.upsertOrder(order, "poll");
-      }
-    }
+    await refreshAllOrders({
+      repository,
+      printify,
+      gelato
+    });
 
     const settings = await repository.ensureSettings();
+    await runAlertScan(repository, bot, settings);
     const openOrders = await repository.listOpenOrders();
     const alerts = await repository.listActiveAlerts();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
@@ -261,9 +337,10 @@ export async function sendOrderAlert(
   bot: Bot,
   chatId: string,
   order: NormalizedOrder,
-  settings: BotSettings
+  settings: BotSettings,
+  kind: OrderAlertKind = "info"
 ) {
-  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings), {
+  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings, kind), {
     reply_markup: orderKeyboard(order)
   });
 }
@@ -284,8 +361,6 @@ export async function findAlertForOrder(
 ) {
   return evaluateOrderAlert(order, {
     nowIso: new Date().toISOString(),
-    preProductionHours: settings.thresholds.preProductionHours,
-    holdHours: settings.thresholds.holdHours,
-    productionBusinessDays: settings.thresholds.productionBusinessDays
+    staleDays: settings.thresholds.staleDays
   });
 }

@@ -74,9 +74,7 @@ export const settings = sqliteTable("settings", {
   piiEmail: integer("pii_email", { mode: "boolean" }).notNull().default(false),
   piiPhone: integer("pii_phone", { mode: "boolean" }).notNull().default(false),
   piiAddress: integer("pii_address", { mode: "boolean" }).notNull().default(false),
-  preProductionHours: integer("pre_production_hours").notNull().default(2),
-  holdHours: integer("hold_hours").notNull().default(24),
-  productionBusinessDays: integer("production_business_days").notNull().default(3),
+  staleDays: integer("stale_days").notNull().default(3),
   lastDigestSentAt: text("last_digest_sent_at")
 });
 

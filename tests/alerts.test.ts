@@ -31,37 +31,32 @@ const baseOrder: NormalizedOrder = {
 };
 
 describe("evaluateOrderAlert", () => {
-  test("returns critical for provider error states", () => {
-    const result = evaluateOrderAlert(
-      { ...baseOrder, status: "failed" },
-      {
-        nowIso: "2025-01-01T01:00:00.000Z",
-        preProductionHours: 2,
-        holdHours: 24,
-        productionBusinessDays: 3
-      }
-    );
-
-    expect(result?.severity).toBe("critical");
-    expect(result?.reason).toBe("provider-error");
-  });
-
-  test("returns warning when a pre-production order exceeds its threshold", () => {
+  test("returns warning when an order has no updates for the configured stale window", () => {
     const result = evaluateOrderAlert(
       { ...baseOrder, status: "pending" },
       {
-        nowIso: "2025-01-01T03:00:01.000Z",
-        preProductionHours: 2,
-        holdHours: 24,
-        productionBusinessDays: 3
+        nowIso: "2025-01-04T00:00:00.000Z",
+        staleDays: 3
       }
     );
 
     expect(result?.severity).toBe("warning");
-    expect(result?.reason).toBe("pre-production-stale");
+    expect(result?.reason).toBe("stale-order");
   });
 
-  test("returns critical when shipped orders exceed provider eta", () => {
+  test("does not alert before the stale threshold is reached", () => {
+    const result = evaluateOrderAlert(
+      { ...baseOrder, status: "pending" },
+      {
+        nowIso: "2025-01-02T23:59:59.000Z",
+        staleDays: 3
+      }
+    );
+
+    expect(result).toBeNull();
+  });
+
+  test("returns critical when the expected arrival date has passed", () => {
     const result = evaluateOrderAlert(
       {
         ...baseOrder,
@@ -70,13 +65,11 @@ describe("evaluateOrderAlert", () => {
       },
       {
         nowIso: "2025-01-03T00:00:00.000Z",
-        preProductionHours: 2,
-        holdHours: 24,
-        productionBusinessDays: 3
+        staleDays: 3
       }
     );
 
     expect(result?.severity).toBe("critical");
-    expect(result?.reason).toBe("eta-exceeded");
+    expect(result?.reason).toBe("delayed-order");
   });
 });

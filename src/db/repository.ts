@@ -59,9 +59,7 @@ export class Repository {
       piiPhone: row.piiPhone,
       piiAddress: row.piiAddress,
       thresholds: {
-        preProductionHours: row.preProductionHours,
-        holdHours: row.holdHours,
-        productionBusinessDays: row.productionBusinessDays
+        staleDays: row.staleDays
       },
       lastDigestSentAt: row.lastDigestSentAt
     };
@@ -83,12 +81,7 @@ export class Repository {
         piiEmail: partial.piiEmail ?? current.piiEmail,
         piiPhone: partial.piiPhone ?? current.piiPhone,
         piiAddress: partial.piiAddress ?? current.piiAddress,
-        preProductionHours:
-          partial.thresholds?.preProductionHours ?? current.thresholds.preProductionHours,
-        holdHours: partial.thresholds?.holdHours ?? current.thresholds.holdHours,
-        productionBusinessDays:
-          partial.thresholds?.productionBusinessDays ??
-          current.thresholds.productionBusinessDays,
+        staleDays: partial.thresholds?.staleDays ?? current.thresholds.staleDays,
         lastDigestSentAt: partial.lastDigestSentAt ?? current.lastDigestSentAt
       })
       .where(eq(settings.telegramChatId, this.config.AUTHORIZED_TELEGRAM_CHAT_ID));

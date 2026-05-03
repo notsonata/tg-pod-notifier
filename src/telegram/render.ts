@@ -1,9 +1,11 @@
 import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 
+export type OrderAlertKind = "new" | "stale" | "delayed" | "info";
+
 function customerSummary(order: NormalizedOrder, settings: BotSettings): string[] {
   const lines: string[] = [];
   if (settings.piiName && order.customer.name) {
-    lines.push(`Customer: ${order.customer.name}`);
+    lines.push(`Name: ${order.customer.name}`);
   }
   if (order.customer.city || order.customer.country) {
     lines.push(
@@ -29,6 +31,19 @@ function customerSummary(order: NormalizedOrder, settings: BotSettings): string[
   return lines;
 }
 
+function alertHeading(kind: OrderAlertKind): string {
+  if (kind === "new") {
+    return "🟢 New Order";
+  }
+  if (kind === "stale") {
+    return "🟠 Stale Order";
+  }
+  if (kind === "delayed") {
+    return "🔴 ⚠️ DELAYED Order ⚠️";
+  }
+  return "ℹ️ Order Update";
+}
+
 export function renderOrderSummary(order: NormalizedOrder): string {
   return [
     `${order.provider.toUpperCase()} order ${order.externalOrderId}`,
@@ -40,9 +55,25 @@ export function renderOrderSummary(order: NormalizedOrder): string {
     .join("\n");
 }
 
-export function renderOrderDetails(order: NormalizedOrder, settings: BotSettings): string {
+export function renderOrderDetails(
+  order: NormalizedOrder,
+  settings: BotSettings,
+  kind: OrderAlertKind = "info"
+): string {
+  const providerLabel = order.provider === "printify" ? "Printify" : "Gelato";
+  const storeLabel = order.shopId ?? "Unknown";
+
   return [
-    renderOrderSummary(order),
+    alertHeading(kind),
+    `[${providerLabel}]`,
+    `[Store ${storeLabel}]`,
+    "",
+    `Order ID: ${order.externalOrderId}`,
+    `Status: ${order.status}`,
+    order.createdAt ? `Created: ${order.createdAt}` : null,
+    order.updatedAt ? `Updated: ${order.updatedAt}` : null,
+    order.etaMaxAt ? `Expected by: ${order.etaMaxAt}` : null,
+    "",
     customerSummary(order, settings).join("\n"),
     order.items.length > 0
       ? `Items:\n${order.items
@@ -56,7 +87,7 @@ export function renderOrderDetails(order: NormalizedOrder, settings: BotSettings
       : null
   ]
     .filter(Boolean)
-    .join("\n\n");
+    .join("\n");
 }
 
 export function renderDigest(
