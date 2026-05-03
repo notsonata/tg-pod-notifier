@@ -73,6 +73,7 @@ export function createDatabase(databasePath: string) {
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       telegram_chat_id TEXT NOT NULL UNIQUE,
+      printify_shop_id TEXT,
       timezone TEXT NOT NULL,
       digest_enabled INTEGER NOT NULL DEFAULT 1,
       digest_hour INTEGER NOT NULL,
@@ -96,6 +97,14 @@ export function createDatabase(databasePath: string) {
       payload_hash TEXT NOT NULL
     );
   `);
+
+  try {
+    sqlite.exec(`ALTER TABLE settings ADD COLUMN printify_shop_id TEXT;`);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
+      throw error;
+    }
+  }
 
   return { sqlite, db };
 }

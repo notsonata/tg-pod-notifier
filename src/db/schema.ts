@@ -63,6 +63,7 @@ export const alerts = sqliteTable("alerts", {
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   telegramChatId: text("telegram_chat_id").notNull().unique(),
+  printifyShopId: text("printify_shop_id"),
   timezone: text("timezone").notNull(),
   digestEnabled: integer("digest_enabled", { mode: "boolean" }).notNull().default(true),
   digestHour: integer("digest_hour").notNull(),

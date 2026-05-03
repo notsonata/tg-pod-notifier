@@ -2,7 +2,8 @@ import { describe, expect, test } from "vitest";
 
 import {
   normalizePrintifyOrder,
-  normalizePrintifyWebhook
+  normalizePrintifyWebhook,
+  type PrintifyShop
 } from "../src/providers/printify.js";
 
 describe("Printify normalization", () => {
@@ -81,5 +82,27 @@ describe("Printify normalization", () => {
     expect(event.eventId).toBe("evt-1");
     expect(event.orderId).toBe("order-1");
     expect(event.status).toBe("shipped");
+  });
+
+  test("preserves the provider shop id when normalizing an order", () => {
+    const normalized = normalizePrintifyOrder(
+      {
+        id: "order-2",
+        status: "pending",
+        line_items: []
+      },
+      "9876"
+    );
+
+    expect(normalized.shopId).toBe("9876");
+  });
+
+  test("maps printify shops into selector options", () => {
+    const shops: PrintifyShop[] = [
+      { id: 5432, title: "Primary", sales_channel: "shopify" },
+      { id: 9876, title: "Secondary", sales_channel: "etsy" }
+    ];
+
+    expect(shops.map((shop) => String(shop.id))).toEqual(["5432", "9876"]);
   });
 });

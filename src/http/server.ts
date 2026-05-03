@@ -31,7 +31,15 @@ export function createServer(deps: {
 
     await repository.markWebhookProcessed("printify", event.eventId, payload);
     await repository.appendStatusEvent(event, "webhook");
-    const refreshed = await printify.getOrder(event.orderId);
+    const resource = payload.resource as { data?: { shop_id?: number | string } } | undefined;
+    const shopId =
+      resource?.data?.shop_id !== undefined
+        ? String(resource.data.shop_id)
+        : await repository.getSelectedPrintifyShopId();
+    if (!shopId) {
+      return reply.status(202).send({ ok: true, skipped: "printify-shop-not-selected" });
+    }
+    const refreshed = await printify.getOrder(shopId, event.orderId);
     await repository.upsertOrder(refreshed, "webhook");
     const settings = await repository.ensureSettings();
     await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings);

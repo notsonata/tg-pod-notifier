@@ -48,3 +48,26 @@ export function privacySettingsKeyboard(settings: BotSettings): InlineKeyboard {
     .text(`Phone ${settings.piiPhone ? "ON" : "OFF"}`, "settings:privacy:phone")
     .text(`Address ${settings.piiAddress ? "ON" : "OFF"}`, "settings:privacy:address");
 }
+
+export function generalSettingsKeyboard(settings: BotSettings): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("Digest", "settings:digest")
+    .text("Privacy", "settings:privacy")
+    .row()
+    .text(
+      settings.printifyShopId
+        ? `Printify Shop ${settings.printifyShopId}`
+        : "Select Printify Shop",
+      "settings:printify"
+    );
+}
+
+export function printifyShopsKeyboard(
+  shops: Array<{ id: string; title: string }>
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  for (const shop of shops.slice(0, 10)) {
+    keyboard.text(shop.title, `settings:printify:select:${shop.id}`).row();
+  }
+  return keyboard.text("Back", "settings:menu");
+}

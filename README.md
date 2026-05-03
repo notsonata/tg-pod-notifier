@@ -55,8 +55,8 @@ tests/                   unit tests
 - a Telegram bot token from BotFather
 - a Telegram group where the bot is added
 - a Gelato API key
+- a Gelato store ID
 - a Printify API token
-- a Printify shop ID
 - a public HTTPS URL for webhook delivery
 - a Cloudflare Tunnel token if you want Docker to publish the app through your domain automatically
 
@@ -82,6 +82,7 @@ AUTHORIZED_TELEGRAM_CHAT_ID=
 PUBLIC_WEBHOOK_BASE_URL=
 CLOUDFLARE_TUNNEL_TOKEN=
 GELATO_API_KEY=
+GELATO_STORE_ID=
 PRINTIFY_API_TOKEN=
 PRINTIFY_SHOP_ID=
 DATABASE_PATH=./data/tg-notifier.sqlite
@@ -158,6 +159,7 @@ The bot uses inline buttons for:
 - snoozing alerts
 - digest settings
 - privacy settings
+- Printify shop selection
 
 ## Running with Docker
 

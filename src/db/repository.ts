@@ -47,6 +47,7 @@ export class Repository {
 
     return {
       telegramChatId: row.telegramChatId,
+      printifyShopId: row.printifyShopId,
       timezone: row.timezone,
       digestEnabled: row.digestEnabled,
       digestHour: row.digestHour,
@@ -71,6 +72,7 @@ export class Repository {
     await this.db
       .update(settings)
       .set({
+        printifyShopId: partial.printifyShopId ?? current.printifyShopId,
         timezone: partial.timezone ?? current.timezone,
         digestEnabled: partial.digestEnabled ?? current.digestEnabled,
         digestHour: partial.digestHour ?? current.digestHour,
@@ -395,5 +397,10 @@ export class Repository {
       etaMaxAt: row.etaMaxAt,
       raw: JSON.parse(row.rawJson)
     }));
+  }
+
+  async getSelectedPrintifyShopId(): Promise<string | null> {
+    const current = await this.ensureSettings();
+    return current.printifyShopId ?? this.config.PRINTIFY_SHOP_ID ?? null;
   }
 }

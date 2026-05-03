@@ -1,4 +1,4 @@
-import { Bot, type Context, InlineKeyboard } from "grammy";
+import { Bot, type Context } from "grammy";
 
 import type { AppConfig } from "../config.js";
 import { evaluateOrderAlert } from "../domain/alerts.js";
@@ -9,8 +9,10 @@ import { Repository } from "../db/repository.js";
 import { isAuthorizedGroupChat } from "./access-control.js";
 import {
   digestSettingsKeyboard,
+  generalSettingsKeyboard,
   orderKeyboard,
   ordersKeyboard,
+  printifyShopsKeyboard,
   privacySettingsKeyboard
 } from "./keyboards.js";
 import { renderDigest, renderOrderDetails, renderOrderSummary } from "./render.js";
@@ -74,9 +76,7 @@ export function createTelegramBot(deps: {
   bot.command("settings", async (ctx) => {
     const settings = await repository.ensureSettings();
     await ctx.reply("Settings", {
-      reply_markup: new InlineKeyboard()
-        .text("Digest", "settings:digest")
-        .text("Privacy", "settings:privacy")
+      reply_markup: generalSettingsKeyboard(settings)
     });
   });
 
@@ -103,8 +103,17 @@ export function createTelegramBot(deps: {
 
   bot.callbackQuery(/^order:refresh:(gelato|printify):(.+)$/, async (ctx) => {
     const [, provider, orderId] = ctx.match;
-    const order =
-      provider === "printify" ? await printify.getOrder(orderId) : await gelato.getOrder(orderId);
+    let order: NormalizedOrder;
+    if (provider === "printify") {
+      const shopId = await repository.getSelectedPrintifyShopId();
+      if (!shopId) {
+        await ctx.answerCallbackQuery({ text: "Select a Printify shop in settings first." });
+        return;
+      }
+      order = await printify.getOrder(shopId, orderId);
+    } else {
+      order = await gelato.getOrder(orderId);
+    }
     await repository.upsertOrder(order, "poll");
     await ctx.editMessageText(renderOrderSummary(order), {
       reply_markup: orderKeyboard(order)
@@ -123,6 +132,35 @@ export function createTelegramBot(deps: {
     const current = await repository.ensureSettings();
     await ctx.editMessageText("Privacy settings", {
       reply_markup: privacySettingsKeyboard(current)
+    });
+  });
+
+  bot.callbackQuery(/^settings:menu$/, async (ctx) => {
+    const settings = await repository.ensureSettings();
+    await ctx.editMessageText("Settings", {
+      reply_markup: generalSettingsKeyboard(settings)
+    });
+  });
+
+  bot.callbackQuery(/^settings:printify$/, async (ctx) => {
+    const shops = await printify.listShops();
+    await ctx.editMessageText("Select the Printify shop for this bot.", {
+      reply_markup: printifyShopsKeyboard(
+        shops.map((shop) => ({
+          id: String(shop.id),
+          title: `${shop.title} (${String(shop.id)})`
+        }))
+      )
+    });
+  });
+
+  bot.callbackQuery(/^settings:printify:select:(.+)$/, async (ctx) => {
+    const [, shopId] = ctx.match;
+    const updated = await repository.updateSettings({
+      printifyShopId: shopId
+    });
+    await ctx.editMessageText(`Selected Printify shop ${shopId}.`, {
+      reply_markup: generalSettingsKeyboard(updated)
     });
   });
 
@@ -198,9 +236,12 @@ export function createTelegramBot(deps: {
   });
 
   bot.callbackQuery(/^orders:refresh$/, async (ctx) => {
-    const printifyOrders = await printify.listOrders();
-    for (const order of printifyOrders) {
-      await repository.upsertOrder(order, "poll");
+    const shopId = await repository.getSelectedPrintifyShopId();
+    if (shopId) {
+      const printifyOrders = await printify.listOrders(shopId);
+      for (const order of printifyOrders) {
+        await repository.upsertOrder(order, "poll");
+      }
     }
 
     const settings = await repository.ensureSettings();

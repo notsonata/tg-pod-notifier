@@ -8,6 +8,7 @@ describe("shouldSendDigest", () => {
       shouldSendDigest(
         {
           telegramChatId: "-1001",
+          printifyShopId: null,
           timezone: "Asia/Manila",
           digestEnabled: true,
           digestHour: 9,
@@ -35,6 +36,7 @@ describe("shouldSendDigest", () => {
       shouldSendDigest(
         {
           telegramChatId: "-1001",
+          printifyShopId: null,
           timezone: "Asia/Manila",
           digestEnabled: true,
           digestHour: 9,

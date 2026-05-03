@@ -122,6 +122,7 @@ export function normalizeGelatoWebhook(payload: GelatoWebhookPayload): Normalize
 export class GelatoClient {
   constructor(
     private readonly apiKey: string,
+    private readonly storeId: string,
     private readonly baseUrl = "https://api.gelato.com"
   ) {}
 
@@ -142,13 +143,21 @@ export class GelatoClient {
 
   async getOrder(orderId: string): Promise<NormalizedOrder> {
     const payload = await this.request<GelatoOrderPayload>(`/v4/orders/${orderId}`);
-    return normalizeGelatoOrder(payload);
+    const normalized = normalizeGelatoOrder(payload);
+    return {
+      ...normalized,
+      shopId: normalized.shopId ?? this.storeId
+    };
   }
 
   async getOrderStatus(orderReferenceId: string): Promise<NormalizedOrder> {
     const payload = await this.request<GelatoOrderPayload>(
       `/v2/order/status/${orderReferenceId}`
     );
-    return normalizeGelatoOrder(payload);
+    const normalized = normalizeGelatoOrder(payload);
+    return {
+      ...normalized,
+      shopId: normalized.shopId ?? this.storeId
+    };
   }
 }

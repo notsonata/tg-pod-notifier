@@ -76,6 +76,7 @@ export interface AlertDecision {
 
 export interface BotSettings {
   telegramChatId: string;
+  printifyShopId: string | null;
   timezone: string;
   digestEnabled: boolean;
   digestHour: number;

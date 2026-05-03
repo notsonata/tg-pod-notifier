@@ -1,5 +1,11 @@
 import type { NormalizedOrder, NormalizedOrderEvent } from "../domain/types.js";
 
+export interface PrintifyShop {
+  id: number | string;
+  title: string;
+  sales_channel?: string;
+}
+
 interface PrintifyLineItem {
   product_id?: string;
   quantity?: number;
@@ -81,7 +87,10 @@ function statusFromWebhook(type: string, status: string | undefined): string {
   return status ?? "pending";
 }
 
-export function normalizePrintifyOrder(payload: PrintifyOrderPayload): NormalizedOrder {
+export function normalizePrintifyOrder(
+  payload: PrintifyOrderPayload,
+  shopId: string | null = null
+): NormalizedOrder {
   const customerName = [payload.address_to?.first_name, payload.address_to?.last_name]
     .filter(Boolean)
     .join(" ");
@@ -90,7 +99,7 @@ export function normalizePrintifyOrder(payload: PrintifyOrderPayload): Normalize
     provider: "printify",
     externalOrderId: payload.id,
     referenceOrderId: null,
-    shopId: null,
+    shopId,
     status: payload.status ?? "pending",
     createdAt: asIso(payload.created_at),
     updatedAt: asIso(payload.updated_at),
@@ -148,7 +157,6 @@ export function normalizePrintifyWebhook(
 export class PrintifyClient {
   constructor(
     private readonly apiToken: string,
-    private readonly shopId: string,
     private readonly baseUrl = "https://api.printify.com/v1"
   ) {}
 
@@ -166,19 +174,23 @@ export class PrintifyClient {
     return (await response.json()) as T;
   }
 
-  async listOrders(): Promise<NormalizedOrder[]> {
-    const payload = await this.request<{ data?: PrintifyOrderPayload[]; next?: string }>(
-      `/shops/${this.shopId}/orders.json`
-    );
-
-    return (payload.data ?? []).map(normalizePrintifyOrder);
+  async listShops(): Promise<PrintifyShop[]> {
+    return this.request<PrintifyShop[]>("/shops.json");
   }
 
-  async getOrder(orderId: string): Promise<NormalizedOrder> {
-    const payload = await this.request<PrintifyOrderPayload>(
-      `/shops/${this.shopId}/orders/${orderId}.json`
+  async listOrders(shopId: string): Promise<NormalizedOrder[]> {
+    const payload = await this.request<{ data?: PrintifyOrderPayload[]; next?: string }>(
+      `/shops/${shopId}/orders.json`
     );
 
-    return normalizePrintifyOrder(payload);
+    return (payload.data ?? []).map((order) => normalizePrintifyOrder(order, shopId));
+  }
+
+  async getOrder(shopId: string, orderId: string): Promise<NormalizedOrder> {
+    const payload = await this.request<PrintifyOrderPayload>(
+      `/shops/${shopId}/orders/${orderId}.json`
+    );
+
+    return normalizePrintifyOrder(payload, shopId);
   }
 }

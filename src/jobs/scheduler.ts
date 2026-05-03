@@ -10,7 +10,11 @@ import { shouldSendDigest } from "./digest.js";
 import { sendDigest, sendOrderAlert } from "../telegram/bot.js";
 
 async function refreshPrintifyOrders(printify: PrintifyClient, repository: Repository) {
-  const orders = await printify.listOrders();
+  const shopId = await repository.getSelectedPrintifyShopId();
+  if (!shopId) {
+    return;
+  }
+  const orders = await printify.listOrders(shopId);
   for (const order of orders) {
     await repository.upsertOrder(order, "poll");
   }

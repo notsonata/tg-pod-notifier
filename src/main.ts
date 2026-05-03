@@ -12,8 +12,11 @@ async function main() {
   const { db } = createDatabase(config.DATABASE_PATH);
   const repository = new Repository(db, config);
   const settings = await repository.ensureSettings();
-  const printify = new PrintifyClient(config.PRINTIFY_API_TOKEN, config.PRINTIFY_SHOP_ID);
-  const gelato = new GelatoClient(config.GELATO_API_KEY);
+  if (!settings.printifyShopId && config.PRINTIFY_SHOP_ID) {
+    await repository.updateSettings({ printifyShopId: config.PRINTIFY_SHOP_ID });
+  }
+  const printify = new PrintifyClient(config.PRINTIFY_API_TOKEN);
+  const gelato = new GelatoClient(config.GELATO_API_KEY, config.GELATO_STORE_ID);
   const bot = createTelegramBot({
     config,
     repository,
