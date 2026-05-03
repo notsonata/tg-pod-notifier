@@ -1,6 +1,6 @@
 export type ProviderName = "gelato" | "printify";
 
-export type AlertSeverity = "warning" | "critical";
+export type AlertSeverity = "warning" | "critical" | "success";
 
 export interface TrackingLink {
   carrier: string | null;
@@ -70,6 +70,7 @@ export interface AlertDecision {
 export interface BotSettings {
   telegramChatId: string;
   printifyShopId: string | null;
+  printifyShopName: string | null;
   timezone: string;
   digestEnabled: boolean;
   digestHour: number;

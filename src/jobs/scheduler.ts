@@ -47,12 +47,18 @@ export function startScheduler(deps: {
   const { repository, bot, settings, printify, gelato } = deps;
 
   cron.schedule("*/30 * * * *", async () => {
-    await refreshAllOrders({
+    const summary = await refreshAllOrders({
       repository,
       printify,
       gelato
     });
     const currentSettings = await repository.ensureSettings();
+    for (const fulfilled of summary.newlyFulfilled) {
+      const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+      if (order) {
+        await sendOrderAlert(bot, currentSettings.telegramChatId, order, currentSettings, "fulfilled");
+      }
+    }
     await runAlertScan(repository, bot, currentSettings);
   });
 

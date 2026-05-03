@@ -1,6 +1,6 @@
 import type { AlertDecision, AlertThresholds, NormalizedOrder } from "./types.js";
 
-const TERMINAL_STATUSES = new Set(["delivered", "returned", "canceled", "failed"]);
+const TERMINAL_STATUSES = new Set(["delivered", "fulfilled", "returned", "canceled", "failed"]);
 
 function daysBetween(startIso: string | null, endIso: string): number {
   if (!startIso) {

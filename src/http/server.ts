@@ -41,10 +41,16 @@ export function createServer(deps: {
     }
     const refreshed = await printify.getOrder(shopId, event.orderId);
     const existing = await repository.getOrder("printify", refreshed.externalOrderId);
-    await repository.upsertOrder(refreshed, "webhook");
+    const result = await repository.upsertOrder(refreshed, "webhook");
     const settings = await repository.ensureSettings();
     if (!existing) {
       await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "new");
+    } else if (
+      result.statusChanged &&
+      result.currentStatus.toLowerCase() === "fulfilled" &&
+      result.previousStatus?.toLowerCase() !== "fulfilled"
+    ) {
+      await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "fulfilled");
     }
     return reply.status(202).send({ ok: true });
   });
@@ -70,7 +76,7 @@ export function createServer(deps: {
       minDeliveryDate?: string;
       maxDeliveryDate?: string;
     };
-    await repository.upsertOrder(
+    const result = await repository.upsertOrder(
       {
         ...refreshed,
         etaMinAt: deliveryEstimate.minDeliveryDate
@@ -85,6 +91,12 @@ export function createServer(deps: {
     const settings = await repository.ensureSettings();
     if (!existing) {
       await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "new");
+    } else if (
+      result.statusChanged &&
+      result.currentStatus.toLowerCase() === "fulfilled" &&
+      result.previousStatus?.toLowerCase() !== "fulfilled"
+    ) {
+      await sendOrderAlert(bot, settings.telegramChatId, refreshed, settings, "fulfilled");
     }
     return reply.status(202).send({ ok: true });
   });

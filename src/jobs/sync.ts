@@ -6,6 +6,10 @@ export interface RefreshSummary {
   printifyOrders: number;
   gelatoOrders: number;
   printifyShopSelected: boolean;
+  newlyFulfilled: Array<{
+    provider: "printify" | "gelato";
+    externalOrderId: string;
+  }>;
 }
 
 export async function refreshAllOrders(deps: {
@@ -16,13 +20,24 @@ export async function refreshAllOrders(deps: {
   const { repository, printify, gelato } = deps;
   let printifyOrders = 0;
   let gelatoOrders = 0;
+  const newlyFulfilled: RefreshSummary["newlyFulfilled"] = [];
 
   const shopId = await repository.getSelectedPrintifyShopId();
   if (shopId) {
     const orders = await printify.listOrders(shopId);
     printifyOrders = orders.length;
     for (const order of orders) {
-      await repository.upsertOrder(order, "poll");
+      const result = await repository.upsertOrder(order, "poll");
+      if (
+        result.statusChanged &&
+        result.currentStatus.toLowerCase() === "fulfilled" &&
+        result.previousStatus?.toLowerCase() !== "fulfilled"
+      ) {
+        newlyFulfilled.push({
+          provider: order.provider,
+          externalOrderId: order.externalOrderId
+        });
+      }
     }
   }
 
@@ -32,12 +47,23 @@ export async function refreshAllOrders(deps: {
     const refreshed = order.referenceOrderId
       ? await gelato.getOrderStatus(order.referenceOrderId)
       : await gelato.getOrder(order.externalOrderId);
-    await repository.upsertOrder(refreshed, "poll");
+    const result = await repository.upsertOrder(refreshed, "poll");
+    if (
+      result.statusChanged &&
+      result.currentStatus.toLowerCase() === "fulfilled" &&
+      result.previousStatus?.toLowerCase() !== "fulfilled"
+    ) {
+      newlyFulfilled.push({
+        provider: refreshed.provider,
+        externalOrderId: refreshed.externalOrderId
+      });
+    }
   }
 
   return {
     printifyOrders,
     gelatoOrders,
-    printifyShopSelected: Boolean(shopId)
+    printifyShopSelected: Boolean(shopId),
+    newlyFulfilled
   };
 }

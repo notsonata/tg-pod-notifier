@@ -16,6 +16,8 @@ function orderUniqueKey(order: Pick<NormalizedOrder, "provider" | "externalOrder
   return `${order.provider}:${order.externalOrderId}`;
 }
 
+const TERMINAL_ORDER_STATUSES = new Set(["delivered", "fulfilled", "returned", "canceled", "failed"]);
+
 export class Repository {
   constructor(
     private readonly db: AppDatabase,
@@ -48,6 +50,7 @@ export class Repository {
     return {
       telegramChatId: row.telegramChatId,
       printifyShopId: row.printifyShopId,
+      printifyShopName: row.printifyShopName,
       timezone: row.timezone,
       digestEnabled: row.digestEnabled,
       digestHour: row.digestHour,
@@ -71,6 +74,7 @@ export class Repository {
       .update(settings)
       .set({
         printifyShopId: partial.printifyShopId ?? current.printifyShopId,
+        printifyShopName: partial.printifyShopName ?? current.printifyShopName,
         timezone: partial.timezone ?? current.timezone,
         digestEnabled: partial.digestEnabled ?? current.digestEnabled,
         digestHour: partial.digestHour ?? current.digestHour,
@@ -106,7 +110,15 @@ export class Repository {
     });
   }
 
-  async upsertOrder(order: NormalizedOrder, source: "webhook" | "poll"): Promise<void> {
+  async upsertOrder(
+    order: NormalizedOrder,
+    source: "webhook" | "poll"
+  ): Promise<{
+    isNew: boolean;
+    statusChanged: boolean;
+    previousStatus: string | null;
+    currentStatus: string;
+  }> {
     const uniqueKey = orderUniqueKey(order);
     const existing = await this.db.query.orders.findFirst({
       where: eq(orders.uniqueKey, uniqueKey)
@@ -157,7 +169,8 @@ export class Repository {
       );
     }
 
-    if (!existing || existing.status !== order.status) {
+    const statusChanged = !existing || existing.status !== order.status;
+    if (statusChanged) {
       await this.db.insert(statusEvents).values({
         orderUniqueKey: uniqueKey,
         provider: order.provider,
@@ -169,6 +182,22 @@ export class Repository {
         rawJson: JSON.stringify(order.raw)
       });
     }
+
+    if (TERMINAL_ORDER_STATUSES.has(order.status.toLowerCase())) {
+      await this.db
+        .update(alerts)
+        .set({
+          status: "resolved"
+        })
+        .where(and(eq(alerts.orderUniqueKey, uniqueKey), eq(alerts.status, "active")));
+    }
+
+    return {
+      isNew: !existing,
+      statusChanged,
+      previousStatus: existing?.status ?? null,
+      currentStatus: order.status
+    };
   }
 
   async appendStatusEvent(event: NormalizedOrderEvent, source: "webhook" | "poll"): Promise<void> {
@@ -187,7 +216,7 @@ export class Repository {
 
   async listOpenOrders(): Promise<NormalizedOrder[]> {
     const rows = await this.db.query.orders.findMany({
-      where: sql`${orders.status} NOT IN ('delivered', 'canceled', 'failed', 'returned')`,
+      where: sql`${orders.status} NOT IN ('delivered', 'fulfilled', 'canceled', 'failed', 'returned')`,
       orderBy: [desc(orders.updatedAt)]
     });
 

@@ -6,7 +6,7 @@ import { runAlertScan, startScheduler } from "./jobs/scheduler.js";
 import { refreshAllOrders } from "./jobs/sync.js";
 import { GelatoClient } from "./providers/gelato.js";
 import { PrintifyClient } from "./providers/printify.js";
-import { createTelegramBot } from "./telegram/bot.js";
+import { createTelegramBot, sendOrderAlert } from "./telegram/bot.js";
 
 async function main() {
   const config = loadConfig();
@@ -42,12 +42,19 @@ async function main() {
 
   await bot.init();
   await server.listen({ host: "0.0.0.0", port: config.PORT });
-  await refreshAllOrders({
+  const summary = await refreshAllOrders({
     repository,
     printify,
     gelato
   });
-  await runAlertScan(repository, bot, await repository.ensureSettings());
+  const latestSettings = await repository.ensureSettings();
+  for (const fulfilled of summary.newlyFulfilled) {
+    const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+    if (order) {
+      await sendOrderAlert(bot, latestSettings.telegramChatId, order, latestSettings, "fulfilled");
+    }
+  }
+  await runAlertScan(repository, bot, latestSettings);
   void bot.start({
     onStart: () => {
       console.log("Telegram bot polling started.");

@@ -53,8 +53,10 @@ export function generalSettingsKeyboard(settings: BotSettings): InlineKeyboard {
     .text("Privacy", "settings:privacy")
     .row()
     .text(
-      settings.printifyShopId
-        ? `Printify Shop ${settings.printifyShopId}`
+      settings.printifyShopName
+        ? `Printify ${settings.printifyShopName}`
+        : settings.printifyShopId
+          ? `Printify Shop ${settings.printifyShopId}`
         : "Select Printify Shop",
       "settings:printify"
     )

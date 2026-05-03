@@ -87,6 +87,12 @@ export function createTelegramBot(deps: {
       gelato
     });
     const settings = await repository.ensureSettings();
+    for (const fulfilled of summary.newlyFulfilled) {
+      const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+      if (order) {
+        await sendOrderAlert(bot, settings.telegramChatId, order, settings, "fulfilled");
+      }
+    }
     await runAlertScan(repository, bot, settings);
     const openOrders = await repository.listOpenOrders();
     const alerts = await repository.listActiveAlerts();
@@ -205,12 +211,18 @@ export function createTelegramBot(deps: {
 
   bot.callbackQuery(/^settings:printify:select:(.+)$/, async (ctx) => {
     const [, shopId] = ctx.match;
+    const shops = await printify.listShops();
+    const selectedShop = shops.find((shop) => String(shop.id) === shopId);
     const updated = await repository.updateSettings({
-      printifyShopId: shopId
+      printifyShopId: shopId,
+      printifyShopName: selectedShop?.title ?? null
     });
-    await ctx.editMessageText(`Selected Printify shop ${shopId}.`, {
+    await ctx.editMessageText(
+      `Selected Printify shop ${selectedShop?.title ?? shopId}.`,
+      {
       reply_markup: generalSettingsKeyboard(updated)
-    });
+      }
+    );
   });
 
   bot.callbackQuery(/^settings:stale-days$/, async (ctx) => {
@@ -313,13 +325,19 @@ export function createTelegramBot(deps: {
   });
 
   bot.callbackQuery(/^orders:refresh$/, async (ctx) => {
-    await refreshAllOrders({
+    const summary = await refreshAllOrders({
       repository,
       printify,
       gelato
     });
 
     const settings = await repository.ensureSettings();
+    for (const fulfilled of summary.newlyFulfilled) {
+      const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+      if (order) {
+        await sendOrderAlert(bot, settings.telegramChatId, order, settings, "fulfilled");
+      }
+    }
     await runAlertScan(repository, bot, settings);
     const openOrders = await repository.listOpenOrders();
     const alerts = await repository.listActiveAlerts();

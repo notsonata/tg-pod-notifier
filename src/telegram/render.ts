@@ -1,6 +1,6 @@
 import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 
-export type OrderAlertKind = "new" | "stale" | "delayed" | "info";
+export type OrderAlertKind = "new" | "stale" | "delayed" | "fulfilled" | "info";
 
 function customerSummary(order: NormalizedOrder, settings: BotSettings): string[] {
   const lines: string[] = [];
@@ -41,6 +41,9 @@ function alertHeading(kind: OrderAlertKind): string {
   if (kind === "delayed") {
     return "🔴 ⚠️ DELAYED Order ⚠️";
   }
+  if (kind === "fulfilled") {
+    return "✅ Fulfilled Order";
+  }
   return "ℹ️ Order Update";
 }
 
@@ -61,20 +64,34 @@ export function renderOrderDetails(
   kind: OrderAlertKind = "info"
 ): string {
   const providerLabel = order.provider === "printify" ? "Printify" : "Gelato";
-  const storeLabel = order.shopId ?? "Unknown";
+  const storeLabel =
+    order.provider === "printify" && settings.printifyShopName
+      ? settings.printifyShopName
+      : order.shopId ?? "Unknown";
 
-  return [
+  const identityBlock = [
     alertHeading(kind),
+    "",
     `[${providerLabel}]`,
     `[Store ${storeLabel}]`,
-    "",
-    `Order ID: ${order.externalOrderId}`,
+    `Order ID: ${order.externalOrderId}`
+  ].join("\n");
+
+  const statusBlock = [
     `Status: ${order.status}`,
     order.createdAt ? `Created: ${order.createdAt}` : null,
     order.updatedAt ? `Updated: ${order.updatedAt}` : null,
-    order.etaMaxAt ? `Expected by: ${order.etaMaxAt}` : null,
-    "",
-    customerSummary(order, settings).join("\n"),
+    order.etaMaxAt ? `Expected by: ${order.etaMaxAt}` : null
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const customerBlock = customerSummary(order, settings).join("\n");
+
+  return [
+    identityBlock,
+    statusBlock,
+    customerBlock,
     order.items.length > 0
       ? `Items:\n${order.items
           .map((item) => `- ${item.title} x${item.quantity} [${item.status}]`)
@@ -87,7 +104,7 @@ export function renderOrderDetails(
       : null
   ]
     .filter(Boolean)
-    .join("\n");
+    .join("\n\n");
 }
 
 export function renderDigest(
