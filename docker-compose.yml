@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    restart: unless-stopped
+    expose:
+      - "38127"
+    ports:
+      - "38127:38127"
+    volumes:
+      - ./data:/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    depends_on:
+      - app
+    env_file:
+      - .env
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
