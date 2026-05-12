@@ -6,7 +6,11 @@ import { runAlertScan, startScheduler } from "./jobs/scheduler.js";
 import { refreshAllOrders } from "./jobs/sync.js";
 import { GelatoClient } from "./providers/gelato.js";
 import { PrintifyClient } from "./providers/printify.js";
-import { createTelegramBot, sendOrderAlert } from "./telegram/bot.js";
+import {
+  createTelegramBot,
+  registerTelegramCommands,
+  sendOrderAlert
+} from "./telegram/bot.js";
 
 async function main() {
   const config = loadConfig();
@@ -41,6 +45,8 @@ async function main() {
   });
 
   await bot.init();
+  await registerTelegramCommands(bot, config.AUTHORIZED_TELEGRAM_CHAT_ID);
+  console.log(`Registered Telegram commands for chat ${config.AUTHORIZED_TELEGRAM_CHAT_ID}.`);
   await server.listen({ host: "0.0.0.0", port: config.PORT });
   const summary = await refreshAllOrders({
     repository,

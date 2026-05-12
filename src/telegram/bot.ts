@@ -25,6 +25,17 @@ import {
 } from "./render.js";
 
 type AppContext = Context;
+type TelegramBot = Bot<AppContext>;
+
+export const TELEGRAM_COMMANDS = [
+  { command: "start", description: "Activate the bot in this group" },
+  { command: "help", description: "Show available commands" },
+  { command: "orders", description: "List active tracked orders" },
+  { command: "refresh", description: "Refresh provider order data now" },
+  { command: "digest", description: "View digest settings" },
+  { command: "settings", description: "Open bot settings" },
+  { command: "privacy", description: "Configure order detail visibility" }
+] as const;
 
 async function loadOrder(
   repository: Repository,
@@ -42,16 +53,6 @@ export function createTelegramBot(deps: {
 }) {
   const { config, repository, printify, gelato } = deps;
   const bot = new Bot<AppContext>(config.TELEGRAM_BOT_TOKEN);
-
-  void bot.api.setMyCommands([
-    { command: "start", description: "Activate the bot in this group" },
-    { command: "help", description: "Show available commands" },
-    { command: "orders", description: "List active tracked orders" },
-    { command: "refresh", description: "Refresh provider order data now" },
-    { command: "digest", description: "View digest settings" },
-    { command: "settings", description: "Open bot settings" },
-    { command: "privacy", description: "Configure order detail visibility" }
-  ]);
 
   bot.use(async (ctx, next) => {
     const chatId = ctx.chat?.id ?? ctx.callbackQuery?.message?.chat.id;
@@ -349,6 +350,30 @@ export function createTelegramBot(deps: {
   });
 
   return bot;
+}
+
+export async function registerTelegramCommands(
+  bot: TelegramBot,
+  chatId: string | number
+) {
+  const numericChatId = typeof chatId === "number" ? chatId : Number(chatId);
+
+  await bot.api.setMyCommands(TELEGRAM_COMMANDS);
+  await bot.api.setMyCommands(TELEGRAM_COMMANDS, {
+    scope: { type: "all_group_chats" }
+  });
+  await bot.api.setMyCommands(TELEGRAM_COMMANDS, {
+    scope: {
+      type: "chat",
+      chat_id: numericChatId
+    }
+  });
+  await bot.api.setChatMenuButton({
+    chat_id: numericChatId,
+    menu_button: {
+      type: "commands"
+    }
+  });
 }
 
 export async function sendOrderAlert(
