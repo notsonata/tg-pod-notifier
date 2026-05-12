@@ -368,12 +368,15 @@ export async function registerTelegramCommands(
       chat_id: numericChatId
     }
   });
-  await bot.api.setChatMenuButton({
-    chat_id: numericChatId,
-    menu_button: {
-      type: "commands"
-    }
-  });
+
+  if (numericChatId > 0) {
+    await bot.api.setChatMenuButton({
+      chat_id: numericChatId,
+      menu_button: {
+        type: "commands"
+      }
+    });
+  }
 }
 
 export async function sendOrderAlert(
