@@ -157,7 +157,7 @@ Gelato
 
 📦 Order: <copyable external order id>
 👤 Customer: <customer name|Unknown>
-📍 Status: <mapped Printify-style status> <- <previous mapped status>
+📍 Status: <mapped Printify-style status> &lt;- <previous mapped status>
 ```
 
 When there are no active orders:

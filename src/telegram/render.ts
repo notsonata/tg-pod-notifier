@@ -96,7 +96,7 @@ function formatTracking(order: NormalizedOrder): string {
   }
 
   return order.trackingLinks
-    .map((tracking) => tracking.trackingUrl ?? tracking.trackingNumber)
+    .map((tracking) => htmlEscape(tracking.trackingUrl ?? tracking.trackingNumber))
     .join("\n");
 }
 
@@ -170,7 +170,7 @@ export function renderDigest(
       const previousStatusLabel = previousStatus ? displayStatus(previousStatus) : null;
       const statusLine =
         previousStatusLabel && previousStatusLabel !== currentStatus
-          ? `📍 Status: ${currentStatus} <- ${previousStatusLabel}`
+          ? `📍 Status: ${currentStatus} &lt;- ${previousStatusLabel}`
           : `📍 Status: ${currentStatus}`;
 
       lines.push(

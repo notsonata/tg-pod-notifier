@@ -138,7 +138,7 @@ describe("renderDigest", () => {
       "",
       "📦 Order: <code>69d52d6b24b9796bcd0604aa</code>",
       "👤 Customer: Jordan Larkin",
-      "📍 Status: Ready to ship <- In production",
+      "📍 Status: Ready to ship &lt;- In production",
       "",
       "Gelato",
       "🏬 Peddlex",
