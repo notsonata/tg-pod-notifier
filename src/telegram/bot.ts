@@ -87,42 +87,22 @@ export function createTelegramBot(deps: {
   });
 
   bot.command("refresh", async (ctx) => {
-    const summary = await refreshAllOrders({
+    await refreshAllOrders({
       repository
     });
     const settings = await repository.ensureSettings();
-    for (const notification of summary.orderDetailsNotifications) {
-      const order = await repository.getOrder(notification.provider, notification.externalOrderId);
-      if (order) {
-        await sendOrderAlert(
-          bot,
-          settings.telegramChatId,
-          order,
-          settings,
-          await storeNameMap(repository)
-        );
-      }
-    }
     const openOrders = await repository.listOpenOrders();
-    const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
+    const stores = await storeNameMap(repository);
+    if (openOrders.length === 0) {
+      await ctx.reply("No open orders found.");
+      return;
+    }
 
-    await ctx.reply(
-      [
-        "🔄 Refresh complete.",
-        `🖨️ Printify stores enabled: ${summary.printifyShopSelected ? "yes" : "no"}`,
-        `🖨️ Printify orders refreshed: ${summary.printifyOrders}`,
-        `🌐 Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
-        `📦 Active tracked orders: ${openOrders.length}`,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      {
-        reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
-      }
-    );
-    await ctx.reply(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
-      reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
-    });
+    for (const order of openOrders) {
+      await ctx.reply(renderOrderDetails(order, settings, stores), {
+        reply_markup: orderKeyboard(order)
+      });
+    }
   });
 
   bot.command("digest", async (ctx) => {

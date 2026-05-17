@@ -46,14 +46,14 @@ No open orders found.
 ### `/refresh`
 
 ```text
-🔄 Refresh complete.
-🖨️ Printify stores enabled: <yes|no>
-🖨️ Printify orders refreshed: <count>
-🌐 Gelato tracked orders refreshed: <count>
-📦 Active tracked orders: <count>
+<One Order Details message per active not-delivered order>
 ```
 
-After the refresh summary, the bot also sends the digest message listed below.
+When no active orders exist:
+
+```text
+No open orders found.
+```
 
 ### `/digest`
 
@@ -237,7 +237,7 @@ These are short Telegram callback-query popup messages.
 ### Order List
 
 ```text
-<provider>:<external order id>
+<provider icon> <customer name>
 🔄 Refresh all
 📋 Digest settings
 ```

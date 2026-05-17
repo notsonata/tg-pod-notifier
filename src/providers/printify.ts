@@ -59,13 +59,16 @@ export function normalizePrintifyOrder(
   const customerName = [payload.address_to?.first_name, payload.address_to?.last_name]
     .filter(Boolean)
     .join(" ");
+  const status = payload.shipments?.some((shipment) => Boolean(shipment.delivered_at))
+    ? "delivered"
+    : payload.status ?? "pending";
 
   return {
     provider: "printify",
     externalOrderId: payload.id,
     referenceOrderId: null,
     shopId,
-    status: payload.status ?? "pending",
+    status,
     sentToProductionAt: asIso(payload.sent_to_production_at),
     totalCost:
       typeof payload.total_price === "number"
@@ -93,7 +96,7 @@ export function normalizePrintifyOrder(
         sku: item.metadata?.sku ?? null,
         title: item.metadata?.title ?? item.metadata?.variant_label ?? "Unnamed item",
         quantity: item.quantity ?? 1,
-        status: item.status ?? payload.status ?? "pending"
+        status: item.status ?? status
       })) ?? [],
     trackingLinks:
       payload.shipments

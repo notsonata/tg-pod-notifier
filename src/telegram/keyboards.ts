@@ -5,7 +5,12 @@ import type { BotSettings, NormalizedOrder, ProviderKeyConfig, ProviderStoreConf
 export function ordersKeyboard(orders: NormalizedOrder[]): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   for (const order of orders.slice(0, 10)) {
-    keyboard.text(`${order.provider}:${order.externalOrderId}`, `order:view:${order.provider}:${order.externalOrderId}`).row();
+    const providerIcon = order.provider === "printify" ? "🖨️" : "🌐";
+    const customer = order.customer.name ?? "Unknown";
+    keyboard.text(
+      `${providerIcon} ${customer}`,
+      `order:view:${order.provider}:${order.externalOrderId}`
+    ).row();
   }
   keyboard.text("🔄 Refresh all", "orders:refresh").row();
   keyboard.text("📋 Digest settings", "settings:digest");

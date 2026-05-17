@@ -88,6 +88,23 @@ describe("Printify normalization", () => {
     expect(normalized.shopId).toBe("9876");
   });
 
+  test("treats Printify orders with delivered shipments as delivered", () => {
+    const normalized = normalizePrintifyOrder(
+      printifyOrderPayload({
+        status: "fulfilled",
+        shipments: [
+          {
+            carrier: "USPS",
+            tracking_number: "TRACK-1",
+            delivered_at: "2026-04-16T00:00:00.000Z"
+          }
+        ]
+      })
+    );
+
+    expect(normalized.status).toBe("delivered");
+  });
+
   test("maps printify shops into selector options", () => {
     const shops: PrintifyShop[] = [
       { id: 5432, title: "Primary", sales_channel: "shopify" },
