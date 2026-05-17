@@ -57,4 +57,62 @@ describe("Gelato normalization", () => {
     expect(normalized.referenceOrderId).toBe("G-260515162121");
   });
 
+  test("normalizes hydrated Gelato detail payload customer, cost, items, and tracking", () => {
+    const normalized = normalizeGelatoOrder({
+      id: "45e8d98e-ba22-4e0c-93ae-26bf78f61ca2",
+      orderReferenceId: "4059882153",
+      fulfillmentStatus: "in_transit",
+      currency: "JPY",
+      storeId: "store-1",
+      shippingAddress: {
+        firstName: "Terry",
+        lastName: "Kessler",
+        city: "Tokyo",
+        country: "JP"
+      },
+      items: [
+        {
+          id: "item-1",
+          itemReferenceId: "5060794426",
+          productName: "Premium Matte Paper Wooden Mounted Framed Poster",
+          quantity: 2,
+          fulfillmentStatus: "shipped"
+        }
+      ],
+      shipment: {
+        packages: [
+          {
+            trackingCode: "1ZE93448YW93849145",
+            trackingUrl: "https://tracking.example/gelato"
+          }
+        ]
+      },
+      receipts: [
+        {
+          currency: "JPY",
+          totalInclVat: 12003.44
+        }
+      ]
+    });
+
+    expect(normalized.customer.name).toBe("Terry Kessler");
+    expect(normalized.totalCost).toEqual({
+      amount: 1200344,
+      currency: "JPY"
+    });
+    expect(normalized.items[0]).toMatchObject({
+      externalItemId: "5060794426",
+      title: "Premium Matte Paper Wooden Mounted Framed Poster",
+      quantity: 2,
+      status: "shipped"
+    });
+    expect(normalized.trackingLinks).toEqual([
+      {
+        carrier: null,
+        trackingNumber: "1ZE93448YW93849145",
+        trackingUrl: "https://tracking.example/gelato"
+      }
+    ]);
+  });
+
 });

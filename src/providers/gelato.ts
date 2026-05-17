@@ -7,11 +7,29 @@ interface GelatoTrackingCode {
 }
 
 interface GelatoOrderItem {
+  id?: string;
   itemReferenceId?: string;
+  productName?: string;
+  quantity?: number;
   status?: string;
   fulfillmentStatus?: string;
   trackingCode?: GelatoTrackingCode[];
   productionLog?: unknown[];
+}
+
+interface GelatoAddressPayload {
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  fullName?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  postCode?: string;
 }
 
 interface GelatoOrderPayload {
@@ -29,18 +47,19 @@ interface GelatoOrderPayload {
   lastName?: string;
   country?: string;
   orderItems?: GelatoOrderItem[];
-  recipient?: {
-    firstName?: string;
-    lastName?: string;
-    city?: string;
-    state?: string;
-    country?: string;
-    email?: string;
-    phone?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    postCode?: string;
+  items?: GelatoOrderItem[];
+  recipient?: GelatoAddressPayload;
+  shippingAddress?: GelatoAddressPayload;
+  shipment?: {
+    packages?: Array<{
+      trackingCode?: string;
+      trackingUrl?: string;
+    }>;
   };
+  receipts?: Array<{
+    currency?: string;
+    totalInclVat?: number;
+  }>;
 }
 
 function asIso(value: string | undefined): string | null {
@@ -51,12 +70,47 @@ function asOptionalString(value: string | null | undefined): string | null {
   return value === null || value === undefined || value === "" ? null : value;
 }
 
+function joinedName(...values: Array<string | null | undefined>): string | null {
+  const name = values.filter(Boolean).join(" ").trim();
+  return name || null;
+}
+
+function customerName(payload: GelatoOrderPayload): string | null {
+  const address = payload.shippingAddress ?? payload.recipient;
+  return (
+    asOptionalString(address?.fullName) ??
+    asOptionalString(address?.name) ??
+    joinedName(address?.firstName, address?.lastName) ??
+    joinedName(payload.firstName, payload.lastName)
+  );
+}
+
+function totalCost(payload: GelatoOrderPayload): NormalizedOrder["totalCost"] {
+  const directTotal = payload.totalInclVat ? Number(payload.totalInclVat) : NaN;
+  if (Number.isFinite(directTotal) && payload.currency) {
+    return {
+      amount: Math.round(directTotal * 100),
+      currency: payload.currency
+    };
+  }
+
+  const receipt = payload.receipts?.find(
+    (candidate) => typeof candidate.totalInclVat === "number" && candidate.currency
+  );
+  if (receipt?.currency && typeof receipt.totalInclVat === "number") {
+    return {
+      amount: Math.round(receipt.totalInclVat * 100),
+      currency: receipt.currency
+    };
+  }
+
+  return null;
+}
+
 export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrder {
-  const customerName = [payload.recipient?.firstName, payload.recipient?.lastName]
-    .filter(Boolean)
-    .join(" ");
+  const address = payload.shippingAddress ?? payload.recipient;
   const status = payload.fulfillmentStatus ?? payload.productionStatus ?? "created";
-  const totalInclVat = payload.totalInclVat ? Number(payload.totalInclVat) : NaN;
+  const items = payload.items ?? payload.orderItems ?? [];
 
   return {
     provider: "gelato",
@@ -66,44 +120,47 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
     shopId: payload.storeId ?? null,
     status,
     sentToProductionAt: null,
-    totalCost:
-      Number.isFinite(totalInclVat) && payload.currency
-        ? {
-            amount: Math.round(totalInclVat * 100),
-            currency: payload.currency
-          }
-        : null,
+    totalCost: totalCost(payload),
     createdAt: asIso(payload.createdAt),
     updatedAt: asIso(payload.updatedAt),
     customer: {
-      name: customerName || [payload.firstName, payload.lastName].filter(Boolean).join(" ") || null,
-      city: payload.recipient?.city ?? null,
-      region: payload.recipient?.state ?? null,
-      country: payload.recipient?.country ?? payload.country ?? null,
-      email: payload.recipient?.email ?? null,
-      phone: payload.recipient?.phone ?? null,
-      address1: payload.recipient?.addressLine1 ?? null,
-      address2: payload.recipient?.addressLine2 ?? null,
-      postalCode: payload.recipient?.postCode ?? null
+      name: customerName(payload),
+      city: address?.city ?? null,
+      region: address?.state ?? null,
+      country: address?.country ?? payload.country ?? null,
+      email: address?.email ?? null,
+      phone: address?.phone ?? null,
+      address1: address?.addressLine1 ?? null,
+      address2: address?.addressLine2 ?? null,
+      postalCode: address?.postCode ?? null
     },
     items:
-      payload.orderItems?.map((item) => ({
-        externalItemId: item.itemReferenceId ?? null,
+      items.map((item) => ({
+        externalItemId: item.itemReferenceId ?? item.id ?? null,
         sku: null,
-        title: item.itemReferenceId ?? "Gelato item",
-        quantity: 1,
+        title: item.productName ?? item.itemReferenceId ?? "Gelato item",
+        quantity: item.quantity ?? 1,
         status: item.status ?? item.fulfillmentStatus ?? status
-      })) ?? [],
+      })),
     trackingLinks:
-      payload.orderItems?.flatMap((item) =>
-        (item.trackingCode ?? [])
+      [
+        ...items.flatMap((item) =>
+          (item.trackingCode ?? [])
+            .filter((tracking) => Boolean(tracking.trackingCode))
+            .map((tracking) => ({
+              carrier: null,
+              trackingNumber: tracking.trackingCode ?? "",
+              trackingUrl: tracking.trackingUrl ?? null
+            }))
+        ),
+        ...(payload.shipment?.packages ?? [])
           .filter((tracking) => Boolean(tracking.trackingCode))
           .map((tracking) => ({
             carrier: null,
             trackingNumber: tracking.trackingCode ?? "",
             trackingUrl: tracking.trackingUrl ?? null
           }))
-      ) ?? [],
+      ],
     providerUrl: null,
     etaMinAt: null,
     etaMaxAt: null,

@@ -65,18 +65,15 @@ function asOptionalString(value: string | number | null | undefined): string | n
 
 function printifyDisplayOrderId(payload: PrintifyOrderPayload): string {
   return (
-    asOptionalString(payload.app_order_id) ??
     asOptionalString(payload.metadata?.shop_order_label) ??
     asOptionalString(payload.metadata?.shop_order_id) ??
+    asOptionalString(payload.app_order_id) ??
     payload.id
   );
 }
 
 function printifyReferenceOrderId(payload: PrintifyOrderPayload): string | null {
-  return (
-    asOptionalString(payload.metadata?.shop_order_label) ??
-    asOptionalString(payload.metadata?.shop_order_id)
-  );
+  return asOptionalString(payload.app_order_id);
 }
 
 function shipmentIsDelivered(shipment: PrintifyShipment & { delivered_at?: string | null }): boolean {

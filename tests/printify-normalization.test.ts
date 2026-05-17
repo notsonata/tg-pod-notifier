@@ -110,16 +110,16 @@ describe("Printify normalization", () => {
     const normalized = normalizePrintifyOrder(
       printifyOrderPayload({
         id: "69d0a2b79a528a773f074579",
-        app_order_id: 4018675916,
+        app_order_id: "13091824.376",
         metadata: {
-          shop_order_label: "#13091824.376"
+          shop_order_label: "4018675916"
         }
       })
     );
 
     expect(normalized.externalOrderId).toBe("69d0a2b79a528a773f074579");
     expect(normalized.displayOrderId).toBe("4018675916");
-    expect(normalized.referenceOrderId).toBe("#13091824.376");
+    expect(normalized.referenceOrderId).toBe("13091824.376");
   });
 
   test("treats shipment status delivered as delivered even without a delivery timestamp", () => {
