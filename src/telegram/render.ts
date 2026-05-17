@@ -6,36 +6,36 @@ import {
 } from "../domain/types.js";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "⏸️ On hold",
-  "on-hold": "⏸️ On hold",
-  created: "⏸️ On hold",
-  "on-hold-submit-order": "⚠️ On hold: Submit order",
-  "payment-not-received": "⚠️ On hold: Action required",
-  "out-of-stock": "⚠️ On hold: Action required",
-  "sending-to-production": "📤 Sending to production",
-  "sent-to-production": "📤 Sending to production",
-  "in-production": "🏭 In production",
-  in_production: "🏭 In production",
-  printed: "🏭 In production",
-  "has-issues": "🚨 Has issues",
-  error: "🚨 Has issues",
-  failed: "🚨 Has issues",
-  canceled: "❌ Canceled",
-  cancelled: "❌ Canceled",
-  fulfilled: "📦 Ready to ship",
-  "ready-to-ship": "📦 Ready to ship",
-  passed: "📦 Ready to ship",
-  shipped: "🚚 Shipped",
-  "on-the-way": "🚛 On the way",
-  in_transit: "🚛 On the way",
-  "available-for-pickup": "📍 Available for pickup",
-  "out-for-delivery": "🏃 Out for delivery",
-  "delivery-attempt": "🔔 Delivery attempt",
-  "shipping-issue": "🚨 Shipping issue",
-  exception: "🚨 Shipping issue",
-  "return-to-sender": "↩️ Return to sender",
-  returned: "↩️ Return to sender",
-  delivered: "✅ Delivered"
+  pending: "On hold",
+  "on-hold": "On hold",
+  created: "On hold",
+  "on-hold-submit-order": "On hold: Submit order",
+  "payment-not-received": "On hold: Action required",
+  "out-of-stock": "On hold: Action required",
+  "sending-to-production": "Sending to production",
+  "sent-to-production": "Sending to production",
+  "in-production": "In production",
+  in_production: "In production",
+  printed: "In production",
+  "has-issues": "Has issues",
+  error: "Has issues",
+  failed: "Has issues",
+  canceled: "Canceled",
+  cancelled: "Canceled",
+  fulfilled: "Ready to ship",
+  "ready-to-ship": "Ready to ship",
+  passed: "Ready to ship",
+  shipped: "Shipped",
+  "on-the-way": "On the way",
+  in_transit: "On the way",
+  "available-for-pickup": "Available for pickup",
+  "out-for-delivery": "Out for delivery",
+  "delivery-attempt": "Delivery attempt",
+  "shipping-issue": "Shipping issue",
+  exception: "Shipping issue",
+  "return-to-sender": "Return to sender",
+  returned: "Return to sender",
+  delivered: "Delivered"
 };
 
 function normalizeStatusKey(status: string): string {
@@ -43,7 +43,18 @@ function normalizeStatusKey(status: string): string {
 }
 
 function displayStatus(status: string): string {
-  return STATUS_LABELS[normalizeStatusKey(status)] ?? "❔ Unknown";
+  return STATUS_LABELS[normalizeStatusKey(status)] ?? "Unknown";
+}
+
+function htmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function copyable(value: string): string {
+  return `<code>${htmlEscape(value)}</code>`;
 }
 
 function formatProductionDate(value: string | null): string {
@@ -96,12 +107,12 @@ export function renderOrderSummary(order: NormalizedOrder): string {
     `Items: ${order.items.length}`,
     order.updatedAt ? `Updated: ${order.updatedAt}` : null
   ]
-    .filter(Boolean)
+    .filter((line): line is string => line !== null)
     .join("\n");
 }
 
 function providerLabel(provider: NormalizedOrder["provider"]): string {
-  return provider === "printify" ? "🖨️ Printify" : "🌐 Gelato";
+  return provider === "printify" ? "Printify" : "Gelato";
 }
 
 export function renderOrderDetails(
@@ -111,16 +122,19 @@ export function renderOrderDetails(
 ): string {
   const isDelivered = normalizeStatusKey(order.status) === "delivered";
   return [
-    `🏷️ Provider: ${providerLabel(order.provider)}`,
-    `🏬 Store: ${order.shopId ? storeNames[order.shopId] ?? order.shopId : "Unknown"}`,
-    `📦 Order: ${order.externalOrderId}`,
+    `🏷️ Provider: ${htmlEscape(providerLabel(order.provider))}`,
+    `🏬 Store: ${htmlEscape(order.shopId ? storeNames[order.shopId] ?? order.shopId : "Unknown")}`,
+    "",
+    `📦 Order: ${copyable(order.externalOrderId)}`,
     `🏭 Sent to production: ${formatProductionDate(order.sentToProductionAt)}`,
-    `👤 Customer: ${order.customer.name ?? "Unknown"}`,
+    "",
+    `👤 Customer: ${htmlEscape(order.customer.name ?? "Unknown")}`,
     `💵 Total cost: ${formatTotalCost(order)}`,
+    "",
     `🚚 Tracking: ${formatTracking(order)}`,
     isDelivered ? null : `📍 Status: ${displayStatus(order.status)}`
   ]
-    .filter(Boolean)
+    .filter((line): line is string => line !== null)
     .join("\n");
 }
 
@@ -146,8 +160,8 @@ export function renderDigest(
       continue;
     }
 
-    lines.push("", providerLabel(provider));
-    lines.push(`🏬 ${providerStoreLabel(providerOrders, storeNames)}`);
+    lines.push("", htmlEscape(providerLabel(provider)));
+    lines.push(`🏬 ${htmlEscape(providerStoreLabel(providerOrders, storeNames))}`);
 
     for (const order of providerOrders) {
       const uniqueKey = `${order.provider}:${order.externalOrderId}`;
@@ -161,8 +175,8 @@ export function renderDigest(
 
       lines.push(
         "",
-        `📦 Order: ${order.externalOrderId}`,
-        `👤 Customer: ${order.customer.name ?? "Unknown"}`,
+        `📦 Order: ${copyable(order.externalOrderId)}`,
+        `👤 Customer: ${htmlEscape(order.customer.name ?? "Unknown")}`,
         statusLine
       );
     }

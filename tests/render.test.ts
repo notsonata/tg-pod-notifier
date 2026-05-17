@@ -47,14 +47,17 @@ describe("renderOrderDetails", () => {
     const rendered = renderOrderDetails(order, settings, { "13091824": "Peddlex" });
 
     expect(rendered).toBe([
-      "🏷️ Provider: 🖨️ Printify",
+      "🏷️ Provider: Printify",
       "🏬 Store: Peddlex",
-      "📦 Order: 69d52d6b24b9796bcd0604aa",
+      "",
+      "📦 Order: <code>69d52d6b24b9796bcd0604aa</code>",
       "🏭 Sent to production: Sun, May 10",
+      "",
       "👤 Customer: Jordan Larkin",
       "💵 Total cost: USD 57.88",
+      "",
       "🚚 Tracking: Pending",
-      "📍 Status: 📦 Ready to ship"
+      "📍 Status: Ready to ship"
     ].join("\n"));
   });
 
@@ -77,7 +80,7 @@ describe("renderOrderDetails", () => {
     expect(rendered).toContain("👤 Customer: Unknown");
     expect(rendered).toContain("💵 Total cost: Pending");
     expect(rendered).toContain("🚚 Tracking: Pending");
-    expect(rendered).toContain("📍 Status: ⏸️ On hold");
+    expect(rendered).toContain("📍 Status: On hold");
   });
 
   test("does not show tracking as pending when a delivered order has no tracking number", () => {
@@ -130,19 +133,19 @@ describe("renderDigest", () => {
     expect(rendered).toBe([
       "📋 Order Digest",
       "",
-      "🖨️ Printify",
+      "Printify",
       "🏬 Peddlex",
       "",
-      "📦 Order: 69d52d6b24b9796bcd0604aa",
+      "📦 Order: <code>69d52d6b24b9796bcd0604aa</code>",
       "👤 Customer: Jordan Larkin",
-      "📍 Status: 📦 Ready to ship <- 🏭 In production",
+      "📍 Status: Ready to ship <- In production",
       "",
-      "🌐 Gelato",
+      "Gelato",
       "🏬 Peddlex",
       "",
-      "📦 Order: gelato-order-1",
+      "📦 Order: <code>gelato-order-1</code>",
       "👤 Customer: Jane Doe",
-      "📍 Status: 🏭 In production"
+      "📍 Status: In production"
     ].join("\n"));
   });
 

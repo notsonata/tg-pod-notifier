@@ -72,12 +72,15 @@ No open orders found.
 Used for individual order alerts and order detail views for every provider.
 
 ```text
-🏷️ Provider: <provider>
+🏷️ Provider: <provider name>
 🏬 Store: <store name or store id|Unknown>
-📦 Order: <external order id>
+
+📦 Order: <copyable external order id>
 🏭 Sent to production: <sent-to-production date|Pending>
+
 👤 Customer: <customer name|Unknown>
 💵 Total cost: <currency amount|Pending>
+
 🚚 Tracking: <tracking url or number|Pending|Delivered, no tracking number|In transit, no tracking number>
 📍 Status: <mapped Printify-style status>
 ```
@@ -87,37 +90,40 @@ Delivered orders are not sent as Order Details. They are also omitted from `/ord
 Example:
 
 ```text
-🏷️ Provider: 🖨️ Printify
+🏷️ Provider: Printify
 🏬 Store: Peddlex
+
 📦 Order: 69d52d6b24b9796bcd0604aa
 🏭 Sent to production: Sun, May 10
+
 👤 Customer: Jordan Larkin
 💵 Total cost: USD 57.88
+
 🚚 Tracking: Pending
-📍 Status: 📦 Ready to ship
+📍 Status: Ready to ship
 ```
 
 Status values currently rendered:
 
 | Provider status | Bot status |
 | --- | --- |
-| `pending`, `on-hold`, `created` | ⏸️ On hold |
-| `on-hold-submit-order` | ⚠️ On hold: Submit order |
-| `payment-not-received`, `out-of-stock` | ⚠️ On hold: Action required |
-| `sending-to-production`, `sent-to-production` | 📤 Sending to production |
-| `in-production`, `in_production`, `printed` | 🏭 In production |
-| `has-issues`, `error`, `failed` | 🚨 Has issues |
-| `canceled`, `cancelled` | ❌ Canceled |
-| `fulfilled`, `ready-to-ship`, `passed` | 📦 Ready to ship |
-| `shipped` | 🚚 Shipped |
-| `on-the-way`, `in_transit` | 🚛 On the way |
-| `available-for-pickup` | 📍 Available for pickup |
-| `out-for-delivery` | 🏃 Out for delivery |
-| `delivery-attempt` | 🔔 Delivery attempt |
-| `shipping-issue`, `exception` | 🚨 Shipping issue |
-| `return-to-sender`, `returned` | ↩️ Return to sender |
-| `delivered` | ✅ Delivered |
-| Any other status | ❔ Unknown |
+| `pending`, `on-hold`, `created` | On hold |
+| `on-hold-submit-order` | On hold: Submit order |
+| `payment-not-received`, `out-of-stock` | On hold: Action required |
+| `sending-to-production`, `sent-to-production` | Sending to production |
+| `in-production`, `in_production`, `printed` | In production |
+| `has-issues`, `error`, `failed` | Has issues |
+| `canceled`, `cancelled` | Canceled |
+| `fulfilled`, `ready-to-ship`, `passed` | Ready to ship |
+| `shipped` | Shipped |
+| `on-the-way`, `in_transit` | On the way |
+| `available-for-pickup` | Available for pickup |
+| `out-for-delivery` | Out for delivery |
+| `delivery-attempt` | Delivery attempt |
+| `shipping-issue`, `exception` | Shipping issue |
+| `return-to-sender`, `returned` | Return to sender |
+| `delivered` | Delivered |
+| Any other status | Unknown |
 
 ## Order Summary
 
@@ -139,17 +145,17 @@ Used for the 6-hour order digest, manual refresh digest output, and the inline `
 ```text
 📋 Order Digest
 
-🖨️ Printify
+Printify
 🏬 <store label>
 
-📦 Order: <external order id>
+📦 Order: <copyable external order id>
 👤 Customer: <customer name|Unknown>
 📍 Status: <mapped Printify-style status>
 
-🌐 Gelato
+Gelato
 🏬 <store label>
 
-📦 Order: <external order id>
+📦 Order: <copyable external order id>
 👤 Customer: <customer name|Unknown>
 📍 Status: <mapped Printify-style status> <- <previous mapped status>
 ```

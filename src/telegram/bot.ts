@@ -100,6 +100,7 @@ export function createTelegramBot(deps: {
 
     for (const order of openOrders) {
       await ctx.reply(renderOrderDetails(order, settings, stores), {
+        parse_mode: "HTML",
         reply_markup: orderKeyboard(order)
       });
     }
@@ -110,6 +111,7 @@ export function createTelegramBot(deps: {
     const openOrders = await repository.listOpenOrders();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
     await ctx.reply(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
+      parse_mode: "HTML",
       reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
     });
   });
@@ -195,6 +197,7 @@ export function createTelegramBot(deps: {
     }
 
     await ctx.editMessageText(renderOrderDetails(order, settings, await storeNameMap(repository)), {
+      parse_mode: "HTML",
       reply_markup: orderKeyboard(order)
     });
   });
@@ -340,6 +343,7 @@ export function createTelegramBot(deps: {
     const openOrders = await repository.listOpenOrders();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
     await ctx.editMessageText(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
+      parse_mode: "HTML",
       reply_markup: ordersKeyboard(openOrders)
     });
     await ctx.answerCallbackQuery({ text: "🔄 Orders refreshed." });
@@ -383,6 +387,7 @@ export async function sendOrderAlert(
   storeNames: Record<string, string> = {}
 ) {
   await bot.api.sendMessage(chatId, renderOrderDetails(order, settings, storeNames), {
+    parse_mode: "HTML",
     reply_markup: orderKeyboard(order)
   });
 }
@@ -396,6 +401,7 @@ export async function sendDigest(
   storeNames: Record<string, string> = {}
 ) {
   await bot.api.sendMessage(chatId, renderDigest(orders, changes, settings, storeNames), {
+    parse_mode: "HTML",
     reply_markup: orders.length > 0 ? ordersKeyboard(orders) : undefined
   });
 }
