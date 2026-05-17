@@ -38,6 +38,8 @@ async function main() {
     repository
   });
   const latestSettings = await repository.ensureSettings();
+  const stores = await repository.listProviderStores();
+  const storeNames = Object.fromEntries(stores.map((store) => [store.externalStoreId, store.name]));
   for (const notification of summary.orderDetailsNotifications) {
     const order = await repository.getOrder(notification.provider, notification.externalOrderId);
     if (order) {
@@ -45,7 +47,8 @@ async function main() {
         bot,
         latestSettings.telegramChatId,
         order,
-        latestSettings
+        latestSettings,
+        storeNames
       );
     }
   }

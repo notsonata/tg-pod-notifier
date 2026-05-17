@@ -48,6 +48,16 @@ export interface NormalizedOrder {
   raw: unknown;
 }
 
+export const HIDDEN_ORDER_STATUS_KEYS = ["delivered"] as const;
+
+export function normalizedOrderStatusKey(status: string): string {
+  return status.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+export function isHiddenOrderStatus(status: string): boolean {
+  return (HIDDEN_ORDER_STATUS_KEYS as readonly string[]).includes(normalizedOrderStatusKey(status));
+}
+
 export interface BotSettings {
   telegramChatId: string;
   timezone: string;

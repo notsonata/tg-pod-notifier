@@ -44,15 +44,17 @@ const order: NormalizedOrder = {
 
 describe("renderOrderDetails", () => {
   test("renders the single provider-neutral order status template", () => {
-    const rendered = renderOrderDetails(order, settings);
+    const rendered = renderOrderDetails(order, settings, { "13091824": "Peddlex" });
 
     expect(rendered).toBe([
-      "Order: 69d52d6b24b9796bcd0604aa",
-      "Sent to production: Sun, May 10",
-      "Customer: Jordan Larkin",
-      "Total cost: USD 57.88",
-      "Tracking: Pending",
-      "Status: Ready to ship"
+      "🏷️ Provider: 🖨️ Printify",
+      "🏬 Store: Peddlex",
+      "📦 Order: 69d52d6b24b9796bcd0604aa",
+      "🏭 Sent to production: Sun, May 10",
+      "👤 Customer: Jordan Larkin",
+      "💵 Total cost: USD 57.88",
+      "🚚 Tracking: Pending",
+      "📍 Status: 📦 Ready to ship"
     ].join("\n"));
   });
 
@@ -71,11 +73,26 @@ describe("renderOrderDetails", () => {
       settings
     );
 
-    expect(rendered).toContain("Sent to production: Pending");
-    expect(rendered).toContain("Customer: Unknown");
-    expect(rendered).toContain("Total cost: Pending");
-    expect(rendered).toContain("Tracking: Pending");
-    expect(rendered).toContain("Status: On hold");
+    expect(rendered).toContain("🏭 Sent to production: Pending");
+    expect(rendered).toContain("👤 Customer: Unknown");
+    expect(rendered).toContain("💵 Total cost: Pending");
+    expect(rendered).toContain("🚚 Tracking: Pending");
+    expect(rendered).toContain("📍 Status: ⏸️ On hold");
+  });
+
+  test("does not show tracking as pending when a delivered order has no tracking number", () => {
+    const rendered = renderOrderDetails(
+      {
+        ...order,
+        status: "delivered",
+        trackingLinks: []
+      },
+      settings,
+      { "13091824": "Peddlex" }
+    );
+
+    expect(rendered).toContain("🚚 Tracking: Delivered, no tracking number");
+    expect(rendered).not.toContain("📍 Status:");
   });
 });
 
@@ -111,25 +128,31 @@ describe("renderDigest", () => {
     );
 
     expect(rendered).toBe([
-      "Order Digest",
+      "📋 Order Digest",
       "",
-      "Printify",
-      "Peddlex",
+      "🖨️ Printify",
+      "🏬 Peddlex",
       "",
-      "Order: 69d52d6b24b9796bcd0604aa",
-      "Customer: Jordan Larkin",
-      "Status: Ready to ship <- In production",
+      "📦 Order: 69d52d6b24b9796bcd0604aa",
+      "👤 Customer: Jordan Larkin",
+      "📍 Status: 📦 Ready to ship <- 🏭 In production",
       "",
-      "Gelato",
-      "Peddlex",
+      "🌐 Gelato",
+      "🏬 Peddlex",
       "",
-      "Order: gelato-order-1",
-      "Customer: Jane Doe",
-      "Status: In production"
+      "📦 Order: gelato-order-1",
+      "👤 Customer: Jane Doe",
+      "📍 Status: 🏭 In production"
     ].join("\n"));
   });
 
   test("renders a simple empty digest", () => {
-    expect(renderDigest([], [])).toBe("Order Digest\n\nNo active orders.");
+    expect(renderDigest([], [])).toBe("📋 Order Digest\n\nNo active orders.");
+  });
+
+  test("omits delivered orders from the digest", () => {
+    expect(renderDigest([{ ...order, status: "delivered" }], [])).toBe(
+      "📋 Order Digest\n\nNo active orders."
+    );
   });
 });

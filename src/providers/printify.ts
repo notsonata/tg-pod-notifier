@@ -23,7 +23,7 @@ interface PrintifyShipment {
   tracking_url?: string;
 }
 
-interface PrintifyOrderPayload {
+export interface PrintifyOrderPayload {
   id: string;
   created_at?: string;
   updated_at?: string;

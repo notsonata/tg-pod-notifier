@@ -2,16 +2,27 @@ import { describe, expect, test } from "vitest";
 
 import {
   normalizePrintifyOrder,
+  type PrintifyOrderPayload,
   type PrintifyShop
 } from "../src/providers/printify.js";
 
+export function printifyOrderPayload(
+  overrides: Partial<PrintifyOrderPayload> = {}
+): PrintifyOrderPayload {
+  return {
+    id: "order-1",
+    created_at: "2025-01-01T00:00:00.000Z",
+    updated_at: "2025-01-01T01:00:00.000Z",
+    status: "pending",
+    total_price: 2500,
+    line_items: [],
+    ...overrides
+  };
+}
+
 describe("Printify normalization", () => {
   test("normalizes an order detail payload", () => {
-    const normalized = normalizePrintifyOrder({
-      id: "order-1",
-      created_at: "2025-01-01T00:00:00.000Z",
-      updated_at: "2025-01-01T01:00:00.000Z",
-      status: "pending",
+    const normalized = normalizePrintifyOrder(printifyOrderPayload({
       sent_to_production_at: "2025-01-01 02:00:00+00:00",
       total_price: 2500,
       total_shipping: 500,
@@ -45,7 +56,7 @@ describe("Printify normalization", () => {
         email: "jane@example.com",
         phone: "+1"
       }
-    });
+    }));
 
     expect(normalized.provider).toBe("printify");
     expect(normalized.externalOrderId).toBe("order-1");
@@ -66,11 +77,11 @@ describe("Printify normalization", () => {
 
   test("preserves the provider shop id when normalizing an order", () => {
     const normalized = normalizePrintifyOrder(
-      {
+      printifyOrderPayload({
         id: "order-2",
         status: "pending",
         line_items: []
-      },
+      }),
       "9876"
     );
 

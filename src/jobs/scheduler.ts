@@ -16,6 +16,10 @@ export function startScheduler(deps: {
       repository
     });
     const currentSettings = await repository.ensureSettings();
+    const stores = await repository.listProviderStores();
+    const storeNames = Object.fromEntries(
+      stores.map((store) => [store.externalStoreId, store.name])
+    );
     for (const notification of summary.orderDetailsNotifications) {
       const order = await repository.getOrder(notification.provider, notification.externalOrderId);
       if (order) {
@@ -23,7 +27,8 @@ export function startScheduler(deps: {
           bot,
           currentSettings.telegramChatId,
           order,
-          currentSettings
+          currentSettings,
+          storeNames
         );
       }
     }

@@ -69,7 +69,7 @@ export function createTelegramBot(deps: {
   });
 
   bot.command("start", async (ctx) => {
-    await ctx.reply("Order notifier is active in this group.");
+    await ctx.reply("📦 Order notifier is active in this group.");
   });
 
   bot.command("help", async (ctx) => {
@@ -98,7 +98,8 @@ export function createTelegramBot(deps: {
           bot,
           settings.telegramChatId,
           order,
-          settings
+          settings,
+          await storeNameMap(repository)
         );
       }
     }
@@ -107,11 +108,11 @@ export function createTelegramBot(deps: {
 
     await ctx.reply(
       [
-        "Refresh complete.",
-        `Printify stores enabled: ${summary.printifyShopSelected ? "yes" : "no"}`,
-        `Printify orders refreshed: ${summary.printifyOrders}`,
-        `Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
-        `Active tracked orders: ${openOrders.length}`,
+        "🔄 Refresh complete.",
+        `🖨️ Printify stores enabled: ${summary.printifyShopSelected ? "yes" : "no"}`,
+        `🖨️ Printify orders refreshed: ${summary.printifyOrders}`,
+        `🌐 Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
+        `📦 Active tracked orders: ${openOrders.length}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -126,17 +127,16 @@ export function createTelegramBot(deps: {
 
   bot.command("digest", async (ctx) => {
     const settings = await repository.ensureSettings();
-    await ctx.reply(
-      `Order digest is ${settings.digestEnabled ? "enabled" : "disabled"}.`,
-      {
-        reply_markup: digestSettingsKeyboard(settings)
-      }
-    );
+    const openOrders = await repository.listOpenOrders();
+    const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
+    await ctx.reply(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
+      reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
+    });
   });
 
   bot.command("settings", async (ctx) => {
     const settings = await repository.ensureSettings();
-    await ctx.reply("Settings", {
+    await ctx.reply("⚙️ Settings", {
       reply_markup: generalSettingsKeyboard(settings)
     });
   });
@@ -170,7 +170,7 @@ export function createTelegramBot(deps: {
         });
       }
       const stores = await repository.listProviderStores("printify");
-      await ctx.reply("Printify key saved. Toggle the stores to capture orders for:", {
+      await ctx.reply("🔑 Printify key saved. Toggle the stores to capture orders for:", {
         reply_markup: printifyShopsKeyboard(
           stores.map((store) => ({
             id: String(store.id),
@@ -185,14 +185,14 @@ export function createTelegramBot(deps: {
     if (pending.type === "gelato-key") {
       const existingKeys = await repository.listProviderKeys("gelato");
       await repository.saveProviderKey("gelato", `Gelato ${existingKeys.length + 1}`, text);
-      await ctx.reply("Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.");
+      await ctx.reply("🔑 Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.");
       return;
     }
 
     const [storeId, ...nameParts] = text.split("|").map((part) => part.trim());
     const name = nameParts.join(" | ");
     if (!storeId || !name) {
-      await ctx.reply("Store not saved. Send it as: store-id | Store Name");
+      await ctx.reply("🏬 Store not saved. Send it as: store-id | Store Name");
       return;
     }
     await repository.upsertProviderStore({
@@ -202,7 +202,7 @@ export function createTelegramBot(deps: {
       name,
       enabled: true
     });
-    await ctx.reply(`Gelato store saved: ${name} (${storeId})`);
+    await ctx.reply(`🏬 Gelato store saved: ${name} (${storeId})`);
   });
 
   bot.callbackQuery(/^order:view:(gelato|printify):(.+)$/, async (ctx) => {
@@ -210,11 +210,11 @@ export function createTelegramBot(deps: {
     const order = await loadOrder(repository, provider, orderId);
     const settings = await repository.ensureSettings();
     if (!order) {
-      await ctx.answerCallbackQuery({ text: "Order not found." });
+      await ctx.answerCallbackQuery({ text: "📦 Order not found." });
       return;
     }
 
-    await ctx.editMessageText(renderOrderDetails(order, settings), {
+    await ctx.editMessageText(renderOrderDetails(order, settings, await storeNameMap(repository)), {
       reply_markup: orderKeyboard(order)
     });
   });
@@ -228,7 +228,7 @@ export function createTelegramBot(deps: {
         (candidate) => candidate.externalStoreId === existing?.shopId
       );
       if (!store) {
-        await ctx.answerCallbackQuery({ text: "Enable the Printify store in settings first." });
+        await ctx.answerCallbackQuery({ text: "🖨️ Enable the Printify store in settings first." });
         return;
       }
       order = await new PrintifyClient(store.apiKey).getOrder(store.externalStoreId, orderId);
@@ -238,7 +238,7 @@ export function createTelegramBot(deps: {
         (candidate) => candidate.externalStoreId === existing?.shopId
       );
       if (!store) {
-        await ctx.answerCallbackQuery({ text: "Enable the Gelato store in settings first." });
+        await ctx.answerCallbackQuery({ text: "🌐 Enable the Gelato store in settings first." });
         return;
       }
       order = await new GelatoClient(store.apiKey, store.externalStoreId).getOrder(orderId);
@@ -247,19 +247,19 @@ export function createTelegramBot(deps: {
     await ctx.editMessageText(renderOrderSummary(order), {
       reply_markup: orderKeyboard(order)
     });
-    await ctx.answerCallbackQuery({ text: "Order refreshed." });
+    await ctx.answerCallbackQuery({ text: "🔄 Order refreshed." });
   });
 
   bot.callbackQuery(/^settings:digest$/, async (ctx) => {
     const current = await repository.ensureSettings();
-    await ctx.editMessageText("Digest settings", {
+    await ctx.editMessageText("📋 Digest settings", {
       reply_markup: digestSettingsKeyboard(current)
     });
   });
 
   bot.callbackQuery(/^settings:menu$/, async (ctx) => {
     const settings = await repository.ensureSettings();
-    await ctx.editMessageText("Settings", {
+    await ctx.editMessageText("⚙️ Settings", {
       reply_markup: generalSettingsKeyboard(settings)
     });
   });
@@ -267,7 +267,7 @@ export function createTelegramBot(deps: {
   bot.callbackQuery(/^settings:printify$/, async (ctx) => {
     const keys = await repository.listProviderKeys("printify");
     const stores = await repository.listProviderStores("printify");
-    await ctx.editMessageText("Printify settings", {
+    await ctx.editMessageText("🖨️ Printify settings", {
       reply_markup: providerKeysKeyboard("printify", keys, stores)
     });
   });
@@ -275,7 +275,7 @@ export function createTelegramBot(deps: {
   bot.callbackQuery(/^settings:gelato$/, async (ctx) => {
     const keys = await repository.listProviderKeys("gelato");
     const stores = await repository.listProviderStores("gelato");
-    await ctx.editMessageText("Gelato settings", {
+    await ctx.editMessageText("🌐 Gelato settings", {
       reply_markup: providerKeysKeyboard("gelato", keys, stores)
     });
   });
@@ -285,7 +285,7 @@ export function createTelegramBot(deps: {
     pendingInputs.set(ctx.chat?.id ?? ctx.callbackQuery.message?.chat.id ?? "unknown", {
       type: provider === "printify" ? "printify-key" : "gelato-key"
     });
-    await ctx.editMessageText(`Paste the ${provider === "printify" ? "Printify" : "Gelato"} API key in the next message.`);
+    await ctx.editMessageText(`🔑 Paste the ${provider === "printify" ? "Printify" : "Gelato"} API key in the next message.`);
   });
 
   bot.callbackQuery(/^settings:gelato:store:add:(\d+)$/, async (ctx) => {
@@ -294,7 +294,7 @@ export function createTelegramBot(deps: {
       type: "gelato-store",
       keyId: Number(keyId)
     });
-    await ctx.editMessageText("Send the Gelato store as: store-id | Store Name");
+    await ctx.editMessageText("🏬 Send the Gelato store as: store-id | Store Name");
   });
 
   bot.callbackQuery(/^settings:store:toggle:(\d+)$/, async (ctx) => {
@@ -302,14 +302,14 @@ export function createTelegramBot(deps: {
     const stores = await repository.listProviderStores();
     const store = stores.find((candidate) => candidate.id === Number(storeId));
     if (!store) {
-      await ctx.answerCallbackQuery({ text: "Store not found." });
+      await ctx.answerCallbackQuery({ text: "🏬 Store not found." });
       return;
     }
     await repository.setProviderStoreEnabled(store.id, !store.enabled);
-    await ctx.answerCallbackQuery({ text: `${store.name} ${store.enabled ? "disabled" : "enabled"}.` });
+    await ctx.answerCallbackQuery({ text: `${store.enabled ? "⬜" : "✅"} ${store.name} ${store.enabled ? "disabled" : "enabled"}.` });
     const updatedStores = await repository.listProviderStores(store.provider);
     const keys = await repository.listProviderKeys(store.provider);
-    await ctx.editMessageText(`${store.provider === "printify" ? "Printify" : "Gelato"} settings`, {
+    await ctx.editMessageText(`${store.provider === "printify" ? "🖨️ Printify" : "🌐 Gelato"} settings`, {
       reply_markup:
         store.provider === "printify"
           ? printifyShopsKeyboard(
@@ -335,7 +335,7 @@ export function createTelegramBot(deps: {
 
   bot.callbackQuery(/^noop:provider$/, async (ctx) => {
     await ctx.answerCallbackQuery({
-      text: "Provider link is not available for this order."
+      text: "📍 Provider link is not available for this order."
     });
   });
 
@@ -352,7 +352,8 @@ export function createTelegramBot(deps: {
           bot,
           settings.telegramChatId,
           order,
-          settings
+          settings,
+          await storeNameMap(repository)
         );
       }
     }
@@ -361,7 +362,7 @@ export function createTelegramBot(deps: {
     await ctx.editMessageText(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
       reply_markup: ordersKeyboard(openOrders)
     });
-    await ctx.answerCallbackQuery({ text: "Orders refreshed." });
+    await ctx.answerCallbackQuery({ text: "🔄 Orders refreshed." });
   });
 
   return bot;
@@ -398,9 +399,10 @@ export async function sendOrderAlert(
   bot: Bot,
   chatId: string,
   order: NormalizedOrder,
-  settings: BotSettings
+  settings: BotSettings,
+  storeNames: Record<string, string> = {}
 ) {
-  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings), {
+  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings, storeNames), {
     reply_markup: orderKeyboard(order)
   });
 }

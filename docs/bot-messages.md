@@ -12,7 +12,7 @@ Telegram command descriptions:
 | `/help` | Show available commands |
 | `/orders` | List active tracked orders |
 | `/refresh` | Refresh provider order data now |
-| `/digest` | View digest settings |
+| `/digest` | Show the current order digest |
 | `/settings` | Open bot settings |
 
 ## Command Replies
@@ -20,7 +20,7 @@ Telegram command descriptions:
 ### `/start`
 
 ```text
-Order notifier is active in this group.
+📦 Order notifier is active in this group.
 ```
 
 ### `/help`
@@ -46,11 +46,11 @@ No open orders found.
 ### `/refresh`
 
 ```text
-Refresh complete.
-Printify stores enabled: <yes|no>
-Printify orders refreshed: <count>
-Gelato tracked orders refreshed: <count>
-Active tracked orders: <count>
+🔄 Refresh complete.
+🖨️ Printify stores enabled: <yes|no>
+🖨️ Printify orders refreshed: <count>
+🌐 Gelato tracked orders refreshed: <count>
+📦 Active tracked orders: <count>
 ```
 
 After the refresh summary, the bot also sends the digest message listed below.
@@ -58,13 +58,13 @@ After the refresh summary, the bot also sends the digest message listed below.
 ### `/digest`
 
 ```text
-Order digest is <enabled|disabled>.
+<Order Digest message>
 ```
 
 ### `/settings`
 
 ```text
-Settings
+⚙️ Settings
 ```
 
 ## Order Details
@@ -72,46 +72,52 @@ Settings
 Used for individual order alerts and order detail views for every provider.
 
 ```text
-Order: <external order id>
-Sent to production: <sent-to-production date|Pending>
-Customer: <customer name|Unknown>
-Total cost: <currency amount|Pending>
-Tracking: <tracking url or number|Pending>
-Status: <mapped Printify-style status>
+🏷️ Provider: <provider>
+🏬 Store: <store name or store id|Unknown>
+📦 Order: <external order id>
+🏭 Sent to production: <sent-to-production date|Pending>
+👤 Customer: <customer name|Unknown>
+💵 Total cost: <currency amount|Pending>
+🚚 Tracking: <tracking url or number|Pending|Delivered, no tracking number|In transit, no tracking number>
+📍 Status: <mapped Printify-style status>
 ```
+
+Delivered orders are not sent as Order Details. They are also omitted from `/orders`, `/refresh`, and the digest.
 
 Example:
 
 ```text
-Order: 69d52d6b24b9796bcd0604aa
-Sent to production: Sun, May 10
-Customer: Jordan Larkin
-Total cost: USD 57.88
-Tracking: Pending
-Status: Ready to ship
+🏷️ Provider: 🖨️ Printify
+🏬 Store: Peddlex
+📦 Order: 69d52d6b24b9796bcd0604aa
+🏭 Sent to production: Sun, May 10
+👤 Customer: Jordan Larkin
+💵 Total cost: USD 57.88
+🚚 Tracking: Pending
+📍 Status: 📦 Ready to ship
 ```
 
 Status values currently rendered:
 
 | Provider status | Bot status |
 | --- | --- |
-| `pending`, `on-hold`, `created` | On hold |
-| `on-hold-submit-order` | On hold: Submit order |
-| `payment-not-received`, `out-of-stock` | On hold: Action required |
-| `sending-to-production`, `sent-to-production` | Sending to production |
-| `in-production`, `in_production`, `printed` | In production |
-| `has-issues`, `error`, `failed` | Has issues |
-| `canceled`, `cancelled` | Canceled |
-| `fulfilled`, `ready-to-ship`, `passed` | Ready to ship |
-| `shipped` | Shipped |
-| `on-the-way`, `in_transit` | On the way |
-| `available-for-pickup` | Available for pickup |
-| `out-for-delivery` | Out for delivery |
-| `delivery-attempt` | Delivery attempt |
-| `shipping-issue`, `exception` | Shipping issue |
-| `return-to-sender`, `returned` | Return to sender |
-| `delivered` | Delivered |
-| Any other status | Unknown |
+| `pending`, `on-hold`, `created` | ⏸️ On hold |
+| `on-hold-submit-order` | ⚠️ On hold: Submit order |
+| `payment-not-received`, `out-of-stock` | ⚠️ On hold: Action required |
+| `sending-to-production`, `sent-to-production` | 📤 Sending to production |
+| `in-production`, `in_production`, `printed` | 🏭 In production |
+| `has-issues`, `error`, `failed` | 🚨 Has issues |
+| `canceled`, `cancelled` | ❌ Canceled |
+| `fulfilled`, `ready-to-ship`, `passed` | 📦 Ready to ship |
+| `shipped` | 🚚 Shipped |
+| `on-the-way`, `in_transit` | 🚛 On the way |
+| `available-for-pickup` | 📍 Available for pickup |
+| `out-for-delivery` | 🏃 Out for delivery |
+| `delivery-attempt` | 🔔 Delivery attempt |
+| `shipping-issue`, `exception` | 🚨 Shipping issue |
+| `return-to-sender`, `returned` | ↩️ Return to sender |
+| `delivered` | ✅ Delivered |
+| Any other status | ❔ Unknown |
 
 ## Order Summary
 
@@ -128,31 +134,32 @@ The `Updated` line is omitted when no update timestamp exists.
 
 ## Digest
 
-Used for daily digests, manual refresh digest output, and the inline `Refresh all` action.
+Used for the 6-hour order digest, manual refresh digest output, and the inline `🔄 Refresh all` action.
 
 ```text
-Daily order digest
+📋 Order Digest
 
-Active orders: <count>
-<provider>: <count>
+🖨️ Printify
+🏬 <store label>
 
-Stuck alerts:
-- <severity>: <alert message>
+📦 Order: <external order id>
+👤 Customer: <customer name|Unknown>
+📍 Status: <mapped Printify-style status>
 
-Recent changes:
-- <provider>:<order id> -> <raw status>
+🌐 Gelato
+🏬 <store label>
+
+📦 Order: <external order id>
+👤 Customer: <customer name|Unknown>
+📍 Status: <mapped Printify-style status> <- <previous mapped status>
 ```
 
-When there are no active alerts:
+When there are no active orders:
 
 ```text
-Stuck alerts: none
-```
+📋 Order Digest
 
-When there are no recent changes:
-
-```text
-Recent changes: none
+No active orders.
 ```
 
 ## Settings Screens
@@ -160,53 +167,53 @@ Recent changes: none
 ### Digest Settings
 
 ```text
-Digest settings
+📋 Digest settings
 ```
 
 ### General Settings
 
 ```text
-Settings
+⚙️ Settings
 ```
 
 ### Printify Settings
 
 ```text
-Printify settings
+🖨️ Printify settings
 ```
 
 ```text
-Paste the Printify API key in the next message.
+🔑 Paste the Printify API key in the next message.
 ```
 
 ```text
-Printify key saved. Toggle the stores to capture orders for:
+🔑 Printify key saved. Toggle the stores to capture orders for:
 ```
 
 ### Gelato Settings
 
 ```text
-Gelato settings
+🌐 Gelato settings
 ```
 
 ```text
-Paste the Gelato API key in the next message.
+🔑 Paste the Gelato API key in the next message.
 ```
 
 ```text
-Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.
+🔑 Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.
 ```
 
 ```text
-Send the Gelato store as: store-id | Store Name
+🏬 Send the Gelato store as: store-id | Store Name
 ```
 
 ```text
-Store not saved. Send it as: store-id | Store Name
+🏬 Store not saved. Send it as: store-id | Store Name
 ```
 
 ```text
-Gelato store saved: <store name> (<store id>)
+🏬 Gelato store saved: <store name> (<store id>)
 ```
 
 ## Callback Popups
@@ -214,15 +221,15 @@ Gelato store saved: <store name> (<store id>)
 These are short Telegram callback-query popup messages.
 
 ```text
-Order not found.
-Enable the Printify store in settings first.
-Enable the Gelato store in settings first.
-Order refreshed.
-Provider link is not available for this order.
-Orders refreshed.
-Store not found.
-<store name> enabled.
-<store name> disabled.
+📦 Order not found.
+🖨️ Enable the Printify store in settings first.
+🌐 Enable the Gelato store in settings first.
+🔄 Order refreshed.
+📍 Provider link is not available for this order.
+🔄 Orders refreshed.
+🏬 Store not found.
+✅ <store name> enabled.
+⬜ <store name> disabled.
 ```
 
 ## Inline Button Labels
@@ -231,16 +238,16 @@ Store not found.
 
 ```text
 <provider>:<external order id>
-Refresh all
-Digest settings
+🔄 Refresh all
+📋 Digest settings
 ```
 
 ### Order Details
 
 ```text
 View Details
-Refresh Now
-Open Provider
+🔄 Refresh Now
+📍 Open Provider
 ```
 
 `Open Provider` only appears when a provider URL is available.
@@ -248,25 +255,25 @@ Open Provider
 ### Digest Settings
 
 ```text
-Disable digest
-Enable digest
+📋 Disable digest
+📋 Enable digest
 ```
 
 ### General Settings
 
 ```text
-Digest
-Printify
-Gelato
+📋 Digest
+🖨️ Printify
+🌐 Gelato
 ```
 
 ### Provider Settings
 
 ```text
-Add Printify key
-Add Gelato key
-Add Gelato store
-ON <store name>
-OFF <store name>
-Back
+🔑 Add Printify key
+🔑 Add Gelato key
+🏬 Add Gelato store
+✅ <store name>
+⬜ <store name>
+⚙️ Back
 ```

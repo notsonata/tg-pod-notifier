@@ -1,4 +1,5 @@
 import type { Repository } from "../db/repository.js";
+import { isHiddenOrderStatus } from "../domain/types.js";
 import { GelatoClient } from "../providers/gelato.js";
 import { PrintifyClient } from "../providers/printify.js";
 
@@ -43,7 +44,10 @@ export async function refreshAllOrders(deps: {
     printifyOrders += orders.length;
     for (const order of orders) {
       const result = await repository.upsertOrder(order, "poll");
-      if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
+      if (
+        !isHiddenOrderStatus(result.currentStatus) &&
+        (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus)))
+      ) {
         orderDetailsNotifications.push({
           provider: order.provider,
           externalOrderId: order.externalOrderId
@@ -59,7 +63,10 @@ export async function refreshAllOrders(deps: {
     gelatoOrders += orders.length;
     for (const order of orders) {
       const result = await repository.upsertOrder(order, "poll");
-      if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
+      if (
+        !isHiddenOrderStatus(result.currentStatus) &&
+        (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus)))
+      ) {
         orderDetailsNotifications.push({
           provider: order.provider,
           externalOrderId: order.externalOrderId
