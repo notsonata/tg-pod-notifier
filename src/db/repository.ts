@@ -8,11 +8,106 @@ import type {
   ProviderKeyName,
   ProviderStoreConfig
 } from "../domain/types.js";
+import { isHiddenOrderStatus } from "../domain/types.js";
 import type { AppDatabase } from "./client.js";
 import { orderItems, orders, providerKeys, providerStores, settings, statusEvents } from "./schema.js";
 
 function orderUniqueKey(order: Pick<NormalizedOrder, "provider" | "externalOrderId">): string {
   return `${order.provider}:${order.externalOrderId}`;
+}
+
+function rawObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function optionalString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function displayOrderIdFromRaw(row: typeof orders.$inferSelect, raw: unknown): string | null {
+  if (row.displayOrderId) {
+    return row.displayOrderId;
+  }
+
+  const payload = rawObject(raw);
+  if (row.provider === "printify") {
+    const metadata = rawObject(payload.metadata);
+    return (
+      optionalString(metadata.shop_order_label) ??
+      optionalString(metadata.shop_order_id) ??
+      optionalString(payload.app_order_id)
+    );
+  }
+
+  if (row.provider === "gelato") {
+    return optionalString(payload.orderReferenceId) ?? optionalString(payload.id);
+  }
+
+  return null;
+}
+
+function statusFromRaw(row: typeof orders.$inferSelect, raw: unknown): string {
+  const payload = rawObject(raw);
+  if (row.provider === "printify") {
+    const shipments = Array.isArray(payload.shipments) ? payload.shipments : [];
+    const delivered = shipments.some((shipment) => {
+      const item = rawObject(shipment);
+      return Boolean(item.delivered_at) || item.status === "delivered";
+    });
+    if (delivered) {
+      return "delivered";
+    }
+  }
+
+  return row.status;
+}
+
+function mapOrderRow(
+  row: typeof orders.$inferSelect,
+  itemRows: Array<typeof orderItems.$inferSelect> = []
+): NormalizedOrder {
+  const raw = JSON.parse(row.rawJson);
+  return {
+    provider: row.provider as NormalizedOrder["provider"],
+    externalOrderId: row.externalOrderId,
+    displayOrderId: displayOrderIdFromRaw(row, raw),
+    referenceOrderId: row.referenceOrderId,
+    shopId: row.shopId,
+    status: statusFromRaw(row, raw),
+    sentToProductionAt: row.sentToProductionAt,
+    totalCost:
+      row.totalCostAmount !== null && row.totalCostCurrency
+        ? {
+            amount: row.totalCostAmount,
+            currency: row.totalCostCurrency
+          }
+        : null,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    customer: {
+      name: row.customerName,
+      city: row.city,
+      region: row.region,
+      country: row.country,
+      email: row.email,
+      phone: row.phone,
+      address1: row.address1,
+      address2: row.address2,
+      postalCode: row.postalCode
+    },
+    items: itemRows.map((item) => ({
+      externalItemId: item.externalItemId,
+      sku: item.sku,
+      title: item.title,
+      quantity: item.quantity,
+      status: item.status
+    })),
+    trackingLinks: JSON.parse(row.trackingLinksJson),
+    providerUrl: row.providerUrl,
+    etaMinAt: row.etaMinAt,
+    etaMaxAt: row.etaMaxAt,
+    raw
+  };
 }
 
 export class Repository {
@@ -298,41 +393,7 @@ export class Repository {
       orderBy: [desc(orders.updatedAt)]
     });
 
-    return rows.map((row) => ({
-      provider: row.provider as NormalizedOrder["provider"],
-      externalOrderId: row.externalOrderId,
-      displayOrderId: row.displayOrderId,
-      referenceOrderId: row.referenceOrderId,
-      shopId: row.shopId,
-      status: row.status,
-      sentToProductionAt: row.sentToProductionAt,
-      totalCost:
-        row.totalCostAmount !== null && row.totalCostCurrency
-          ? {
-              amount: row.totalCostAmount,
-              currency: row.totalCostCurrency
-            }
-          : null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      customer: {
-        name: row.customerName,
-        city: row.city,
-        region: row.region,
-        country: row.country,
-        email: row.email,
-        phone: row.phone,
-        address1: row.address1,
-        address2: row.address2,
-        postalCode: row.postalCode
-      },
-      items: [],
-      trackingLinks: JSON.parse(row.trackingLinksJson),
-      providerUrl: row.providerUrl,
-      etaMinAt: row.etaMinAt,
-      etaMaxAt: row.etaMaxAt,
-      raw: JSON.parse(row.rawJson)
-    }));
+    return rows.map((row) => mapOrderRow(row)).filter((order) => !isHiddenOrderStatus(order.status));
   }
 
   async getOrder(provider: string, externalOrderId: string): Promise<NormalizedOrder | null> {
@@ -348,47 +409,7 @@ export class Repository {
       where: eq(orderItems.orderUniqueKey, row.uniqueKey)
     });
 
-    return {
-      provider: row.provider as NormalizedOrder["provider"],
-      externalOrderId: row.externalOrderId,
-      displayOrderId: row.displayOrderId,
-      referenceOrderId: row.referenceOrderId,
-      shopId: row.shopId,
-      status: row.status,
-      sentToProductionAt: row.sentToProductionAt,
-      totalCost:
-        row.totalCostAmount !== null && row.totalCostCurrency
-          ? {
-              amount: row.totalCostAmount,
-              currency: row.totalCostCurrency
-            }
-          : null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      customer: {
-        name: row.customerName,
-        city: row.city,
-        region: row.region,
-        country: row.country,
-        email: row.email,
-        phone: row.phone,
-        address1: row.address1,
-        address2: row.address2,
-        postalCode: row.postalCode
-      },
-      items: itemRows.map((item) => ({
-        externalItemId: item.externalItemId,
-        sku: item.sku,
-        title: item.title,
-        quantity: item.quantity,
-        status: item.status
-      })),
-      trackingLinks: JSON.parse(row.trackingLinksJson),
-      providerUrl: row.providerUrl,
-      etaMinAt: row.etaMinAt,
-      etaMaxAt: row.etaMaxAt,
-      raw: JSON.parse(row.rawJson)
-    };
+    return mapOrderRow(row, itemRows);
   }
 
   async listRecentStatusEvents(sinceIso: string | null): Promise<Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>> {
@@ -411,41 +432,7 @@ export class Repository {
       where: eq(orders.provider, "gelato")
     });
 
-    return rows.map((row) => ({
-      provider: "gelato",
-      externalOrderId: row.externalOrderId,
-      displayOrderId: row.displayOrderId,
-      referenceOrderId: row.referenceOrderId,
-      shopId: row.shopId,
-      status: row.status,
-      sentToProductionAt: row.sentToProductionAt,
-      totalCost:
-        row.totalCostAmount !== null && row.totalCostCurrency
-          ? {
-              amount: row.totalCostAmount,
-              currency: row.totalCostCurrency
-            }
-          : null,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      customer: {
-        name: row.customerName,
-        city: row.city,
-        region: row.region,
-        country: row.country,
-        email: row.email,
-        phone: row.phone,
-        address1: row.address1,
-        address2: row.address2,
-        postalCode: row.postalCode
-      },
-      items: [],
-      trackingLinks: JSON.parse(row.trackingLinksJson),
-      providerUrl: row.providerUrl,
-      etaMinAt: row.etaMinAt,
-      etaMaxAt: row.etaMaxAt,
-      raw: JSON.parse(row.rawJson)
-    }));
+    return rows.map((row) => mapOrderRow(row));
   }
 
 }

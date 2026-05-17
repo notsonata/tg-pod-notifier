@@ -7,6 +7,7 @@ import { describe, expect, test } from "vitest";
 import type { AppConfig } from "../src/config.js";
 import { createDatabase } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
+import type { NormalizedOrder } from "../src/domain/types.js";
 
 function makeRepository() {
   const dir = mkdtempSync(path.join(os.tmpdir(), "tg-notifier-"));
@@ -80,6 +81,59 @@ describe("provider configuration repository", () => {
       externalStoreId: "gelato-store-1",
       name: "Peddlex",
       enabled: true
+    });
+  });
+
+  test("derives Printify display id and delivered status from legacy raw payload rows", async () => {
+    const repository = makeRepository();
+    const legacyOrder: NormalizedOrder = {
+      provider: "printify",
+      externalOrderId: "69c794cdf6f65f1e87064ade",
+      displayOrderId: null,
+      referenceOrderId: null,
+      shopId: "13091824",
+      status: "fulfilled",
+      sentToProductionAt: null,
+      totalCost: null,
+      createdAt: "2026-03-28T08:43:57.000Z",
+      updatedAt: "2026-03-28T08:43:57.000Z",
+      customer: {
+        name: "PII_DELETED PII_DELETED",
+        city: null,
+        region: null,
+        country: null,
+        email: null,
+        phone: null,
+        address1: null,
+        address2: null,
+        postalCode: null
+      },
+      items: [],
+      trackingLinks: [],
+      providerUrl: null,
+      etaMinAt: null,
+      etaMaxAt: null,
+      raw: {
+        id: "69c794cdf6f65f1e87064ade",
+        app_order_id: "13091824.375",
+        status: "fulfilled",
+        metadata: {
+          shop_order_label: "4014746623"
+        },
+        shipments: [
+          {
+            delivered_at: "2026-04-02 16:29:00+00:00"
+          }
+        ]
+      }
+    };
+
+    await repository.upsertOrder(legacyOrder, "poll");
+
+    await expect(repository.listOpenOrders()).resolves.toEqual([]);
+    await expect(repository.getOrder("printify", "69c794cdf6f65f1e87064ade")).resolves.toMatchObject({
+      displayOrderId: "4014746623",
+      status: "delivered"
     });
   });
 });
