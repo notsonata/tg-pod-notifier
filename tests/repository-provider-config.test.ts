@@ -136,4 +136,116 @@ describe("provider configuration repository", () => {
       status: "delivered"
     });
   });
+
+  test("derives Gelato customer name and status from legacy raw payload rows", async () => {
+    const repository = makeRepository();
+    const legacyOrder: NormalizedOrder = {
+      provider: "gelato",
+      externalOrderId: "45e8d98e-ba22-4e0c-93ae-26bf78f61ca2",
+      displayOrderId: null,
+      referenceOrderId: null,
+      shopId: "gelato-store-1",
+      status: "shipped",
+      sentToProductionAt: null,
+      totalCost: null,
+      createdAt: "2026-05-11T01:06:46.000Z",
+      updatedAt: "2026-05-14T17:22:03.000Z",
+      customer: {
+        name: null,
+        city: null,
+        region: null,
+        country: null,
+        email: null,
+        phone: null,
+        address1: null,
+        address2: null,
+        postalCode: null
+      },
+      items: [],
+      trackingLinks: [],
+      providerUrl: null,
+      etaMinAt: null,
+      etaMaxAt: null,
+      raw: {
+        id: "45e8d98e-ba22-4e0c-93ae-26bf78f61ca2",
+        orderReferenceId: "4059882153",
+        fulfillmentStatus: "in_transit",
+        shippingAddress: {
+          firstName: "Terry",
+          lastName: "Kessler",
+          city: "Tokyo",
+          state: "Tokyo",
+          country: "JP",
+          postCode: "100-0001"
+        }
+      }
+    };
+
+    await repository.upsertOrder(legacyOrder, "poll");
+
+    await expect(repository.listOpenOrders()).resolves.toMatchObject([
+      {
+        displayOrderId: "4059882153",
+        status: "in_transit",
+        customer: {
+          name: "Terry Kessler",
+          city: "Tokyo",
+          region: "Tokyo",
+          country: "JP",
+          postalCode: "100-0001"
+        }
+      }
+    ]);
+  });
+
+  test("filters legacy Gelato delivered rows using raw payload status", async () => {
+    const repository = makeRepository();
+    const legacyOrder: NormalizedOrder = {
+      provider: "gelato",
+      externalOrderId: "ed555091-bb39-4cdf-8c3a-522c231da603",
+      displayOrderId: null,
+      referenceOrderId: null,
+      shopId: "gelato-store-1",
+      status: "shipped",
+      sentToProductionAt: null,
+      totalCost: null,
+      createdAt: "2026-04-21T21:08:52.000Z",
+      updatedAt: "2026-04-29T12:10:37.000Z",
+      customer: {
+        name: null,
+        city: null,
+        region: null,
+        country: null,
+        email: null,
+        phone: null,
+        address1: null,
+        address2: null,
+        postalCode: null
+      },
+      items: [],
+      trackingLinks: [],
+      providerUrl: null,
+      etaMinAt: null,
+      etaMaxAt: null,
+      raw: {
+        id: "ed555091-bb39-4cdf-8c3a-522c231da603",
+        orderReferenceId: "4045043775",
+        fulfillmentStatus: "delivered",
+        shippingAddress: {
+          firstName: "Charbonnier"
+        }
+      }
+    };
+
+    await repository.upsertOrder(legacyOrder, "poll");
+
+    await expect(repository.listOpenOrders()).resolves.toEqual([]);
+    await expect(repository.getOrder("gelato", "ed555091-bb39-4cdf-8c3a-522c231da603")).resolves.toMatchObject({
+      displayOrderId: "4045043775",
+      status: "delivered",
+      customer: {
+        name: "Charbonnier"
+      }
+    });
+  });
 });

@@ -24,6 +24,14 @@ function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function joinedName(...values: Array<unknown>): string | null {
+  const name = values
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" ")
+    .trim();
+  return name || null;
+}
+
 function displayOrderIdFromRaw(row: typeof orders.$inferSelect, raw: unknown): string | null {
   if (row.displayOrderId) {
     return row.displayOrderId;
@@ -59,7 +67,70 @@ function statusFromRaw(row: typeof orders.$inferSelect, raw: unknown): string {
     }
   }
 
+  if (row.provider === "gelato") {
+    return optionalString(payload.fulfillmentStatus) ?? optionalString(payload.productionStatus) ?? row.status;
+  }
+
   return row.status;
+}
+
+function customerNameFromRaw(row: typeof orders.$inferSelect, raw: unknown): string | null {
+  if (row.customerName) {
+    return row.customerName;
+  }
+
+  const payload = rawObject(raw);
+  if (row.provider === "gelato") {
+    const shippingAddress = rawObject(payload.shippingAddress);
+    const recipient = rawObject(payload.recipient);
+    const address =
+      Object.keys(shippingAddress).length > 0
+        ? shippingAddress
+        : Object.keys(recipient).length > 0
+          ? recipient
+          : {};
+
+    return (
+      optionalString(address.fullName) ??
+      optionalString(address.name) ??
+      joinedName(address.firstName, address.lastName) ??
+      joinedName(payload.firstName, payload.lastName)
+    );
+  }
+
+  if (row.provider === "printify") {
+    const addressTo = rawObject(payload.address_to);
+    return joinedName(addressTo.first_name, addressTo.last_name);
+  }
+
+  return null;
+}
+
+function customerFieldFromRaw(
+  row: typeof orders.$inferSelect,
+  raw: unknown,
+  columnValue: string | null,
+  field: string
+): string | null {
+  if (columnValue) {
+    return columnValue;
+  }
+
+  const payload = rawObject(raw);
+  if (row.provider === "gelato") {
+    const shippingAddress = rawObject(payload.shippingAddress);
+    const recipient = rawObject(payload.recipient);
+    const address =
+      Object.keys(shippingAddress).length > 0
+        ? shippingAddress
+        : Object.keys(recipient).length > 0
+          ? recipient
+          : {};
+
+    return optionalString(address[field]);
+  }
+
+  return null;
 }
 
 function mapOrderRow(
@@ -85,15 +156,15 @@ function mapOrderRow(
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     customer: {
-      name: row.customerName,
-      city: row.city,
-      region: row.region,
-      country: row.country,
-      email: row.email,
-      phone: row.phone,
-      address1: row.address1,
-      address2: row.address2,
-      postalCode: row.postalCode
+      name: customerNameFromRaw(row, raw),
+      city: customerFieldFromRaw(row, raw, row.city, "city"),
+      region: customerFieldFromRaw(row, raw, row.region, "state"),
+      country: customerFieldFromRaw(row, raw, row.country, "country"),
+      email: customerFieldFromRaw(row, raw, row.email, "email"),
+      phone: customerFieldFromRaw(row, raw, row.phone, "phone"),
+      address1: customerFieldFromRaw(row, raw, row.address1, "addressLine1"),
+      address2: customerFieldFromRaw(row, raw, row.address2, "addressLine2"),
+      postalCode: customerFieldFromRaw(row, raw, row.postalCode, "postCode")
     },
     items: itemRows.map((item) => ({
       externalItemId: item.externalItemId,
