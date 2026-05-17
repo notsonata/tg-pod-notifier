@@ -21,10 +21,12 @@ interface PrintifyShipment {
   carrier?: string;
   tracking_number?: string;
   tracking_url?: string;
+  status?: string;
 }
 
 export interface PrintifyOrderPayload {
   id: string;
+  app_order_id?: string | number;
   created_at?: string;
   updated_at?: string;
   status?: string;
@@ -32,6 +34,11 @@ export interface PrintifyOrderPayload {
   total_price?: number;
   currency?: string;
   total_shipping?: number;
+  metadata?: {
+    shop_order_id?: string | number;
+    shop_order_label?: string;
+    order_type?: string;
+  };
   line_items?: PrintifyLineItem[];
   shipments?: Array<PrintifyShipment & { shipped_at?: string; delivered_at?: string | null }>;
   address_to?: {
@@ -52,6 +59,30 @@ function asIso(value: string | undefined): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
+function asOptionalString(value: string | number | null | undefined): string | null {
+  return value === null || value === undefined || value === "" ? null : String(value);
+}
+
+function printifyDisplayOrderId(payload: PrintifyOrderPayload): string {
+  return (
+    asOptionalString(payload.app_order_id) ??
+    asOptionalString(payload.metadata?.shop_order_label) ??
+    asOptionalString(payload.metadata?.shop_order_id) ??
+    payload.id
+  );
+}
+
+function printifyReferenceOrderId(payload: PrintifyOrderPayload): string | null {
+  return (
+    asOptionalString(payload.metadata?.shop_order_label) ??
+    asOptionalString(payload.metadata?.shop_order_id)
+  );
+}
+
+function shipmentIsDelivered(shipment: PrintifyShipment & { delivered_at?: string | null }): boolean {
+  return Boolean(shipment.delivered_at) || shipment.status?.toLowerCase() === "delivered";
+}
+
 export function normalizePrintifyOrder(
   payload: PrintifyOrderPayload,
   shopId: string | null = null
@@ -59,14 +90,15 @@ export function normalizePrintifyOrder(
   const customerName = [payload.address_to?.first_name, payload.address_to?.last_name]
     .filter(Boolean)
     .join(" ");
-  const status = payload.shipments?.some((shipment) => Boolean(shipment.delivered_at))
+  const status = payload.shipments?.some((shipment) => shipmentIsDelivered(shipment))
     ? "delivered"
     : payload.status ?? "pending";
 
   return {
     provider: "printify",
     externalOrderId: payload.id,
-    referenceOrderId: null,
+    displayOrderId: printifyDisplayOrderId(payload),
+    referenceOrderId: printifyReferenceOrderId(payload),
     shopId,
     status,
     sentToProductionAt: asIso(payload.sent_to_production_at),
@@ -144,7 +176,15 @@ export class PrintifyClient {
       `/shops/${shopId}/orders.json`
     );
 
-    return (payload.data ?? []).map((order) => normalizePrintifyOrder(order, shopId));
+    return Promise.all(
+      (payload.data ?? []).map(async (order) => {
+        try {
+          return await this.getOrder(shopId, order.id);
+        } catch {
+          return normalizePrintifyOrder(order, shopId);
+        }
+      })
+    );
   }
 
   async getOrder(shopId: string, orderId: string): Promise<NormalizedOrder> {

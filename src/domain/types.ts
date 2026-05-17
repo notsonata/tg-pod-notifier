@@ -29,6 +29,7 @@ export interface NormalizedCustomer {
 export interface NormalizedOrder {
   provider: ProviderName;
   externalOrderId: string;
+  displayOrderId: string | null;
   referenceOrderId: string | null;
   shopId: string | null;
   status: string;

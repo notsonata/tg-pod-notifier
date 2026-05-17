@@ -57,6 +57,10 @@ function copyable(value: string): string {
   return `<code>${htmlEscape(value)}</code>`;
 }
 
+function orderDisplayId(order: NormalizedOrder): string {
+  return order.displayOrderId ?? order.externalOrderId;
+}
+
 function formatProductionDate(value: string | null): string {
   if (!value) {
     return "Pending";
@@ -102,7 +106,7 @@ function formatTracking(order: NormalizedOrder): string {
 
 export function renderOrderSummary(order: NormalizedOrder): string {
   return [
-    `${order.provider.toUpperCase()} order ${order.externalOrderId}`,
+    `${order.provider.toUpperCase()} order ${orderDisplayId(order)}`,
     `Status: ${order.status}`,
     `Items: ${order.items.length}`,
     order.updatedAt ? `Updated: ${order.updatedAt}` : null
@@ -115,6 +119,10 @@ function providerLabel(provider: NormalizedOrder["provider"]): string {
   return provider === "printify" ? "Printify" : "Gelato";
 }
 
+function providerHeader(provider: NormalizedOrder["provider"]): string {
+  return provider === "printify" ? "🖨️ Printify" : "🌐 Gelato";
+}
+
 export function renderOrderDetails(
   order: NormalizedOrder,
   _settings: BotSettings,
@@ -122,10 +130,10 @@ export function renderOrderDetails(
 ): string {
   const isDelivered = normalizeStatusKey(order.status) === "delivered";
   return [
-    `🏷️ Provider: ${htmlEscape(providerLabel(order.provider))}`,
-    `🏬 Store: ${htmlEscape(order.shopId ? storeNames[order.shopId] ?? order.shopId : "Unknown")}`,
+    htmlEscape(providerHeader(order.provider)),
+    `🏬 ${htmlEscape(order.shopId ? storeNames[order.shopId] ?? order.shopId : "Unknown")}`,
     "",
-    `📦 Order: ${copyable(order.externalOrderId)}`,
+    `📦 Order: ${copyable(orderDisplayId(order))}`,
     `🏭 Sent to production: ${formatProductionDate(order.sentToProductionAt)}`,
     "",
     `👤 Customer: ${htmlEscape(order.customer.name ?? "Unknown")}`,
@@ -175,7 +183,7 @@ export function renderDigest(
 
       lines.push(
         "",
-        `📦 Order: ${copyable(order.externalOrderId)}`,
+        `📦 Order: ${copyable(orderDisplayId(order))}`,
         `👤 Customer: ${htmlEscape(order.customer.name ?? "Unknown")}`,
         statusLine
       );

@@ -224,6 +224,7 @@ export class Repository {
     const payload = {
       provider: order.provider,
       externalOrderId: order.externalOrderId,
+      displayOrderId: order.displayOrderId,
       referenceOrderId: order.referenceOrderId,
       shopId: order.shopId,
       status: order.status,
@@ -300,6 +301,7 @@ export class Repository {
     return rows.map((row) => ({
       provider: row.provider as NormalizedOrder["provider"],
       externalOrderId: row.externalOrderId,
+      displayOrderId: row.displayOrderId,
       referenceOrderId: row.referenceOrderId,
       shopId: row.shopId,
       status: row.status,
@@ -349,6 +351,7 @@ export class Repository {
     return {
       provider: row.provider as NormalizedOrder["provider"],
       externalOrderId: row.externalOrderId,
+      displayOrderId: row.displayOrderId,
       referenceOrderId: row.referenceOrderId,
       shopId: row.shopId,
       status: row.status,
@@ -411,6 +414,7 @@ export class Repository {
     return rows.map((row) => ({
       provider: "gelato",
       externalOrderId: row.externalOrderId,
+      displayOrderId: row.displayOrderId,
       referenceOrderId: row.referenceOrderId,
       shopId: row.shopId,
       status: row.status,

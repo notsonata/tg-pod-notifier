@@ -4,6 +4,7 @@ export const orders = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   provider: text("provider").notNull(),
   externalOrderId: text("external_order_id").notNull(),
+  displayOrderId: text("display_order_id"),
   referenceOrderId: text("reference_order_id"),
   shopId: text("shop_id"),
   status: text("status").notNull(),

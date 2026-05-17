@@ -60,6 +60,7 @@ describe("Printify normalization", () => {
 
     expect(normalized.provider).toBe("printify");
     expect(normalized.externalOrderId).toBe("order-1");
+    expect(normalized.displayOrderId).toBe("order-1");
     expect(normalized.sentToProductionAt).toBe("2025-01-01T02:00:00.000Z");
     expect(normalized.totalCost).toEqual({
       amount: 2500,
@@ -97,6 +98,39 @@ describe("Printify normalization", () => {
             carrier: "USPS",
             tracking_number: "TRACK-1",
             delivered_at: "2026-04-16T00:00:00.000Z"
+          }
+        ]
+      })
+    );
+
+    expect(normalized.status).toBe("delivered");
+  });
+
+  test("uses Printify dashboard order id separately from the API order id", () => {
+    const normalized = normalizePrintifyOrder(
+      printifyOrderPayload({
+        id: "69d0a2b79a528a773f074579",
+        app_order_id: 4018675916,
+        metadata: {
+          shop_order_label: "#13091824.376"
+        }
+      })
+    );
+
+    expect(normalized.externalOrderId).toBe("69d0a2b79a528a773f074579");
+    expect(normalized.displayOrderId).toBe("4018675916");
+    expect(normalized.referenceOrderId).toBe("#13091824.376");
+  });
+
+  test("treats shipment status delivered as delivered even without a delivery timestamp", () => {
+    const normalized = normalizePrintifyOrder(
+      printifyOrderPayload({
+        status: "fulfilled",
+        shipments: [
+          {
+            carrier: "SPRING",
+            tracking_number: "CP446675950IE",
+            status: "delivered"
           }
         ]
       })

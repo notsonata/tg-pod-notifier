@@ -13,6 +13,7 @@ const settings: BotSettings = {
 const order: NormalizedOrder = {
   provider: "printify",
   externalOrderId: "69d52d6b24b9796bcd0604aa",
+  displayOrderId: "4052650188",
   referenceOrderId: null,
   shopId: "13091824",
   status: "fulfilled",
@@ -47,10 +48,10 @@ describe("renderOrderDetails", () => {
     const rendered = renderOrderDetails(order, settings, { "13091824": "Peddlex" });
 
     expect(rendered).toBe([
-      "🏷️ Provider: Printify",
-      "🏬 Store: Peddlex",
+      "🖨️ Printify",
+      "🏬 Peddlex",
       "",
-      "📦 Order: <code>69d52d6b24b9796bcd0604aa</code>",
+      "📦 Order: <code>4052650188</code>",
       "🏭 Sent to production: Sun, May 10",
       "",
       "👤 Customer: Jordan Larkin",
@@ -108,6 +109,7 @@ describe("renderDigest", () => {
           ...order,
           provider: "gelato",
           externalOrderId: "gelato-order-1",
+          displayOrderId: "G-260515162121",
           status: "in_production",
           customer: {
             ...order.customer,
@@ -136,14 +138,14 @@ describe("renderDigest", () => {
       "Printify",
       "🏬 Peddlex",
       "",
-      "📦 Order: <code>69d52d6b24b9796bcd0604aa</code>",
+      "📦 Order: <code>4052650188</code>",
       "👤 Customer: Jordan Larkin",
       "📍 Status: Ready to ship &lt;- In production",
       "",
       "Gelato",
       "🏬 Peddlex",
       "",
-      "📦 Order: <code>gelato-order-1</code>",
+      "📦 Order: <code>G-260515162121</code>",
       "👤 Customer: Jane Doe",
       "📍 Status: In production"
     ].join("\n"));

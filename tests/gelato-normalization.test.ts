@@ -38,10 +38,23 @@ describe("Gelato normalization", () => {
 
     expect(normalized.provider).toBe("gelato");
     expect(normalized.externalOrderId).toBe("gelato-order-1");
+    expect(normalized.displayOrderId).toBe("merchant-1");
     expect(normalized.referenceOrderId).toBe("merchant-1");
     expect(normalized.sentToProductionAt).toBeNull();
     expect(normalized.totalCost).toBeNull();
     expect(normalized.items[0]?.status).toBe("printed");
+  });
+
+  test("uses Gelato order reference as the displayed order number", () => {
+    const normalized = normalizeGelatoOrder({
+      id: "45e8d98e-ba22-4e0c-93ae-26bf78f61ca2",
+      orderReferenceId: "G-260515162121",
+      fulfillmentStatus: "in_transit"
+    });
+
+    expect(normalized.externalOrderId).toBe("45e8d98e-ba22-4e0c-93ae-26bf78f61ca2");
+    expect(normalized.displayOrderId).toBe("G-260515162121");
+    expect(normalized.referenceOrderId).toBe("G-260515162121");
   });
 
 });

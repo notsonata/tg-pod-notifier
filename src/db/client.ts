@@ -18,6 +18,7 @@ export function createDatabase(databasePath: string) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       provider TEXT NOT NULL,
       external_order_id TEXT NOT NULL,
+      display_order_id TEXT,
       reference_order_id TEXT,
       shop_id TEXT,
       status TEXT NOT NULL,
@@ -87,6 +88,14 @@ export function createDatabase(databasePath: string) {
       UNIQUE(key_id, external_store_id)
     );
   `);
+
+  try {
+    sqlite.exec(`ALTER TABLE orders ADD COLUMN display_order_id TEXT;`);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
+      throw error;
+    }
+  }
 
   try {
     sqlite.exec(`ALTER TABLE orders ADD COLUMN sent_to_production_at TEXT;`);

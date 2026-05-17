@@ -47,6 +47,10 @@ function asIso(value: string | undefined): string | null {
   return value ? new Date(value).toISOString() : null;
 }
 
+function asOptionalString(value: string | null | undefined): string | null {
+  return value === null || value === undefined || value === "" ? null : value;
+}
+
 export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrder {
   const customerName = [payload.recipient?.firstName, payload.recipient?.lastName]
     .filter(Boolean)
@@ -57,6 +61,7 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
   return {
     provider: "gelato",
     externalOrderId: payload.id ?? payload.orderReferenceId,
+    displayOrderId: asOptionalString(payload.orderReferenceId) ?? asOptionalString(payload.id),
     referenceOrderId: payload.orderReferenceId,
     shopId: payload.storeId ?? null,
     status,
@@ -160,9 +165,20 @@ export class GelatoClient {
       })
     });
 
-    return (payload.orders ?? []).map((order) => ({
-      ...normalizeGelatoOrder(order),
-      shopId: order.storeId ?? this.storeId
-    }));
+    return Promise.all(
+      (payload.orders ?? []).map(async (order) => {
+        const normalized = normalizeGelatoOrder(order);
+        const detailLookupId = normalized.externalOrderId;
+
+        try {
+          return await this.getOrder(detailLookupId);
+        } catch {
+          return {
+            ...normalized,
+            shopId: order.storeId ?? this.storeId
+          };
+        }
+      })
+    );
   }
 }

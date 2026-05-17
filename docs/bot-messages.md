@@ -72,10 +72,10 @@ No open orders found.
 Used for individual order alerts and order detail views for every provider.
 
 ```text
-🏷️ Provider: <provider name>
-🏬 Store: <store name or store id|Unknown>
+<provider emoji> <provider name>
+🏬 <store name or store id|Unknown>
 
-📦 Order: <copyable external order id>
+📦 Order: <copyable dashboard/provider order number>
 🏭 Sent to production: <sent-to-production date|Pending>
 
 👤 Customer: <customer name|Unknown>
@@ -90,10 +90,10 @@ Delivered orders are not sent as Order Details. They are also omitted from `/ord
 Example:
 
 ```text
-🏷️ Provider: Printify
-🏬 Store: Peddlex
+🖨️ Printify
+🏬 Peddlex
 
-📦 Order: 69d52d6b24b9796bcd0604aa
+📦 Order: 4052650188
 🏭 Sent to production: Sun, May 10
 
 👤 Customer: Jordan Larkin
@@ -130,7 +130,7 @@ Status values currently rendered:
 Used after refreshing one order from its inline button.
 
 ```text
-<PROVIDER> order <external order id>
+<PROVIDER> order <dashboard/provider order number>
 Status: <raw provider status>
 Items: <item count>
 Updated: <updated ISO timestamp>
@@ -148,7 +148,7 @@ Used for the 6-hour order digest, manual refresh digest output, and the inline `
 Printify
 🏬 <store label>
 
-📦 Order: <copyable external order id>
+📦 Order: <copyable dashboard/provider order number>
 👤 Customer: <customer name|Unknown>
 📍 Status: <mapped Printify-style status>
 
