@@ -50,9 +50,29 @@ export interface NormalizedOrder {
 
 export interface BotSettings {
   telegramChatId: string;
-  printifyShopId: string | null;
-  printifyShopName: string | null;
   timezone: string;
   digestEnabled: boolean;
   lastDigestSentAt: string | null;
+}
+
+export type ProviderKeyName = "gelato" | "printify";
+
+export interface ProviderKeyConfig {
+  id: number;
+  provider: ProviderKeyName;
+  label: string;
+  apiKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderStoreConfig {
+  id: number;
+  keyId: number;
+  provider: ProviderKeyName;
+  label: string;
+  apiKey: string;
+  externalStoreId: string;
+  name: string;
+  enabled: boolean;
 }

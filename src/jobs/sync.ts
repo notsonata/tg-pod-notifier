@@ -30,18 +30,17 @@ function isProblemStatus(status: string): boolean {
 
 export async function refreshAllOrders(deps: {
   repository: Repository;
-  printify: PrintifyClient;
-  gelato: GelatoClient;
 }): Promise<RefreshSummary> {
-  const { repository, printify, gelato } = deps;
+  const { repository } = deps;
   let printifyOrders = 0;
   let gelatoOrders = 0;
   const orderDetailsNotifications: RefreshSummary["orderDetailsNotifications"] = [];
 
-  const shopId = await repository.getSelectedPrintifyShopId();
-  if (shopId) {
-    const orders = await printify.listOrders(shopId);
-    printifyOrders = orders.length;
+  const printifyStores = await repository.listEnabledProviderStores("printify");
+  for (const store of printifyStores) {
+    const printify = new PrintifyClient(store.apiKey);
+    const orders = await printify.listOrders(store.externalStoreId);
+    printifyOrders += orders.length;
     for (const order of orders) {
       const result = await repository.upsertOrder(order, "poll");
       if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
@@ -53,25 +52,26 @@ export async function refreshAllOrders(deps: {
     }
   }
 
-  const knownGelatoOrders = await repository.listKnownGelatoOrders();
-  gelatoOrders = knownGelatoOrders.length;
-  for (const order of knownGelatoOrders) {
-    const refreshed = order.referenceOrderId
-      ? await gelato.getOrderStatus(order.referenceOrderId)
-      : await gelato.getOrder(order.externalOrderId);
-    const result = await repository.upsertOrder(refreshed, "poll");
-    if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
-      orderDetailsNotifications.push({
-        provider: refreshed.provider,
-        externalOrderId: refreshed.externalOrderId
-      });
+  const gelatoStores = await repository.listEnabledProviderStores("gelato");
+  for (const store of gelatoStores) {
+    const gelato = new GelatoClient(store.apiKey, store.externalStoreId);
+    const orders = await gelato.listOrders();
+    gelatoOrders += orders.length;
+    for (const order of orders) {
+      const result = await repository.upsertOrder(order, "poll");
+      if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
+        orderDetailsNotifications.push({
+          provider: order.provider,
+          externalOrderId: order.externalOrderId
+        });
+      }
     }
   }
 
   return {
     printifyOrders,
     gelatoOrders,
-    printifyShopSelected: Boolean(shopId),
+    printifyShopSelected: printifyStores.length > 0,
     orderDetailsNotifications
   };
 }

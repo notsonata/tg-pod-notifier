@@ -65,11 +65,26 @@ export function createDatabase(databasePath: string) {
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       telegram_chat_id TEXT NOT NULL UNIQUE,
-      printify_shop_id TEXT,
-      printify_shop_name TEXT,
       timezone TEXT NOT NULL,
       digest_enabled INTEGER NOT NULL DEFAULT 1,
       last_digest_sent_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS provider_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL,
+      label TEXT NOT NULL,
+      api_key TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS provider_stores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      external_store_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      UNIQUE(key_id, external_store_id)
     );
   `);
 

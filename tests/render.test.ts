@@ -5,8 +5,6 @@ import { renderDigest, renderOrderDetails } from "../src/telegram/render.js";
 
 const settings: BotSettings = {
   telegramChatId: "-1001",
-  printifyShopId: "13091824",
-  printifyShopName: "Framework Supply Store",
   timezone: "UTC",
   digestEnabled: true,
   lastDigestSentAt: null
@@ -105,8 +103,10 @@ describe("renderDigest", () => {
         }
       ],
       {
-        ...settings,
-        printifyShopName: "Peddlex"
+        ...settings
+      },
+      {
+        "13091824": "Peddlex"
       }
     );
 
@@ -121,7 +121,7 @@ describe("renderDigest", () => {
       "Status: Ready to ship <- In production",
       "",
       "Gelato",
-      "13091824",
+      "Peddlex",
       "",
       "Order: gelato-order-1",
       "Customer: Jane Doe",

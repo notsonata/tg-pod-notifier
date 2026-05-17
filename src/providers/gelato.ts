@@ -22,6 +22,12 @@ interface GelatoOrderPayload {
   orderType?: string;
   createdAt?: string;
   updatedAt?: string;
+  storeId?: string | null;
+  currency?: string;
+  totalInclVat?: string;
+  firstName?: string;
+  lastName?: string;
+  country?: string;
   orderItems?: GelatoOrderItem[];
   recipient?: {
     firstName?: string;
@@ -46,22 +52,29 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
     .filter(Boolean)
     .join(" ");
   const status = payload.fulfillmentStatus ?? payload.productionStatus ?? "created";
+  const totalInclVat = payload.totalInclVat ? Number(payload.totalInclVat) : NaN;
 
   return {
     provider: "gelato",
     externalOrderId: payload.id ?? payload.orderReferenceId,
     referenceOrderId: payload.orderReferenceId,
-    shopId: null,
+    shopId: payload.storeId ?? null,
     status,
     sentToProductionAt: null,
-    totalCost: null,
+    totalCost:
+      Number.isFinite(totalInclVat) && payload.currency
+        ? {
+            amount: Math.round(totalInclVat * 100),
+            currency: payload.currency
+          }
+        : null,
     createdAt: asIso(payload.createdAt),
     updatedAt: asIso(payload.updatedAt),
     customer: {
-      name: customerName || null,
+      name: customerName || [payload.firstName, payload.lastName].filter(Boolean).join(" ") || null,
       city: payload.recipient?.city ?? null,
       region: payload.recipient?.state ?? null,
-      country: payload.recipient?.country ?? null,
+      country: payload.recipient?.country ?? payload.country ?? null,
       email: payload.recipient?.email ?? null,
       phone: payload.recipient?.phone ?? null,
       address1: payload.recipient?.addressLine1 ?? null,
@@ -97,14 +110,16 @@ export class GelatoClient {
   constructor(
     private readonly apiKey: string,
     private readonly storeId: string,
-    private readonly baseUrl = "https://api.gelato.com"
+    private readonly baseUrl = "https://order.gelatoapis.com"
   ) {}
 
-  private async request<T>(path: string): Promise<T> {
+  private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
       headers: {
         "X-API-KEY": this.apiKey,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...init.headers
       }
     });
 
@@ -133,5 +148,21 @@ export class GelatoClient {
       ...normalized,
       shopId: normalized.shopId ?? this.storeId
     };
+  }
+
+  async listOrders(): Promise<NormalizedOrder[]> {
+    const payload = await this.request<{ orders?: GelatoOrderPayload[] }>("/v4/orders:search", {
+      method: "POST",
+      body: JSON.stringify({
+        orderTypes: ["order"],
+        storeIds: [this.storeId],
+        limit: 100
+      })
+    });
+
+    return (payload.orders ?? []).map((order) => ({
+      ...normalizeGelatoOrder(order),
+      shopId: order.storeId ?? this.storeId
+    }));
   }
 }

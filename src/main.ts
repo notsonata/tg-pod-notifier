@@ -4,8 +4,6 @@ import { Repository } from "./db/repository.js";
 import { createServer } from "./http/server.js";
 import { startScheduler } from "./jobs/scheduler.js";
 import { refreshAllOrders } from "./jobs/sync.js";
-import { GelatoClient } from "./providers/gelato.js";
-import { PrintifyClient } from "./providers/printify.js";
 import {
   createTelegramBot,
   registerTelegramCommands,
@@ -16,32 +14,20 @@ async function main() {
   const config = loadConfig();
   const { db } = createDatabase(config.DATABASE_PATH);
   const repository = new Repository(db, config);
-  const settings = await repository.ensureSettings();
-  if (!settings.printifyShopId && config.PRINTIFY_SHOP_ID) {
-    await repository.updateSettings({ printifyShopId: config.PRINTIFY_SHOP_ID });
-  }
-  const printify = new PrintifyClient(config.PRINTIFY_API_TOKEN);
-  const gelato = new GelatoClient(config.GELATO_API_KEY, config.GELATO_STORE_ID);
+  await repository.ensureSettings();
   const bot = createTelegramBot({
     config,
-    repository,
-    printify,
-    gelato
+    repository
   });
   const server = createServer({
     config,
     repository,
-    bot,
-    printify,
-    gelato
+    bot
   });
 
   startScheduler({
     repository,
-    bot,
-    settings,
-    printify,
-    gelato
+    bot
   });
 
   await bot.init();
@@ -49,9 +35,7 @@ async function main() {
   console.log(`Registered Telegram commands for chat ${config.AUTHORIZED_TELEGRAM_CHAT_ID}.`);
   await server.listen({ host: "0.0.0.0", port: config.PORT });
   const summary = await refreshAllOrders({
-    repository,
-    printify,
-    gelato
+    repository
   });
   const latestSettings = await repository.ensureSettings();
   for (const notification of summary.orderDetailsNotifications) {

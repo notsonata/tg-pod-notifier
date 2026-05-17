@@ -2,26 +2,18 @@ import cron from "node-cron";
 import type { Bot } from "grammy";
 
 import type { Repository } from "../db/repository.js";
-import type { BotSettings, NormalizedOrder } from "../domain/types.js";
-import { GelatoClient } from "../providers/gelato.js";
-import { PrintifyClient } from "../providers/printify.js";
 import { refreshAllOrders } from "./sync.js";
 import { sendDigest, sendOrderAlert } from "../telegram/bot.js";
 
 export function startScheduler(deps: {
   repository: Repository;
   bot: Bot;
-  settings: BotSettings;
-  printify: PrintifyClient;
-  gelato: GelatoClient;
 }) {
-  const { repository, bot, settings, printify, gelato } = deps;
+  const { repository, bot } = deps;
 
   cron.schedule("*/30 * * * *", async () => {
     const summary = await refreshAllOrders({
-      repository,
-      printify,
-      gelato
+      repository
     });
     const currentSettings = await repository.ensureSettings();
     for (const notification of summary.orderDetailsNotifications) {
@@ -41,14 +33,16 @@ export function startScheduler(deps: {
     const currentSettings = await repository.ensureSettings();
     if (currentSettings.digestEnabled) {
       await refreshAllOrders({
-        repository,
-        printify,
-        gelato
+        repository
       });
       const openOrders = await repository.listOpenOrders();
       const changes = await repository.listRecentStatusEvents(currentSettings.lastDigestSentAt);
+      const stores = await repository.listProviderStores();
+      const storeNames = Object.fromEntries(
+        stores.map((store) => [store.externalStoreId, store.name])
+      );
 
-      await sendDigest(bot, currentSettings.telegramChatId, openOrders, changes, currentSettings);
+      await sendDigest(bot, currentSettings.telegramChatId, openOrders, changes, currentSettings, storeNames);
       await repository.updateSettings({ lastDigestSentAt: new Date().toISOString() });
     }
   });

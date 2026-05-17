@@ -54,9 +54,25 @@ export const statusEvents = sqliteTable("status_events", {
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   telegramChatId: text("telegram_chat_id").notNull().unique(),
-  printifyShopId: text("printify_shop_id"),
-  printifyShopName: text("printify_shop_name"),
   timezone: text("timezone").notNull(),
   digestEnabled: integer("digest_enabled", { mode: "boolean" }).notNull().default(true),
   lastDigestSentAt: text("last_digest_sent_at")
+});
+
+export const providerKeys = sqliteTable("provider_keys", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  provider: text("provider").notNull(),
+  label: text("label").notNull(),
+  apiKey: text("api_key").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull()
+});
+
+export const providerStores = sqliteTable("provider_stores", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  keyId: integer("key_id").notNull(),
+  provider: text("provider").notNull(),
+  externalStoreId: text("external_store_id").notNull(),
+  name: text("name").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true)
 });

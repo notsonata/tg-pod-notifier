@@ -105,8 +105,10 @@ export function renderOrderDetails(
 export function renderDigest(
   orders: NormalizedOrder[],
   changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>,
-  settings?: BotSettings
+  settings?: BotSettings,
+  storeNames: Record<string, string> = {}
 ): string {
+  void settings;
   if (orders.length === 0) {
     return "Order Digest\n\nNo active orders.";
   }
@@ -122,7 +124,7 @@ export function renderDigest(
     }
 
     lines.push("", provider === "printify" ? "Printify" : "Gelato");
-    lines.push(providerStoreLabel(provider, providerOrders, settings));
+    lines.push(providerStoreLabel(providerOrders, storeNames));
 
     for (const order of providerOrders) {
       const uniqueKey = `${order.provider}:${order.externalOrderId}`;
@@ -146,14 +148,7 @@ export function renderDigest(
   return lines.join("\n");
 }
 
-function providerStoreLabel(
-  provider: NormalizedOrder["provider"],
-  orders: NormalizedOrder[],
-  settings?: BotSettings
-): string {
-  if (provider === "printify") {
-    return settings?.printifyShopName ?? settings?.printifyShopId ?? orders[0]?.shopId ?? "Unknown";
-  }
-
-  return orders[0]?.shopId ?? "Unknown";
+function providerStoreLabel(orders: NormalizedOrder[], storeNames: Record<string, string>): string {
+  const shopId = orders[0]?.shopId;
+  return shopId ? storeNames[shopId] ?? shopId : "Unknown";
 }

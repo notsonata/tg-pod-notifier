@@ -12,7 +12,8 @@ import {
   generalSettingsKeyboard,
   orderKeyboard,
   ordersKeyboard,
-  printifyShopsKeyboard
+  printifyShopsKeyboard,
+  providerKeysKeyboard
 } from "./keyboards.js";
 import {
   renderDigest,
@@ -22,6 +23,12 @@ import {
 
 type AppContext = Context;
 type TelegramBot = Bot<AppContext>;
+type PendingInput =
+  | { type: "printify-key" }
+  | { type: "gelato-key" }
+  | { type: "gelato-store"; keyId: number };
+
+const pendingInputs = new Map<number | string, PendingInput>();
 
 export const TELEGRAM_COMMANDS = [
   { command: "start", description: "Activate the bot in this group" },
@@ -40,13 +47,16 @@ async function loadOrder(
   return repository.getOrder(provider, orderId);
 }
 
+async function storeNameMap(repository: Repository): Promise<Record<string, string>> {
+  const stores = await repository.listProviderStores();
+  return Object.fromEntries(stores.map((store) => [store.externalStoreId, store.name]));
+}
+
 export function createTelegramBot(deps: {
   config: AppConfig;
   repository: Repository;
-  printify: PrintifyClient;
-  gelato: GelatoClient;
 }) {
-  const { config, repository, printify, gelato } = deps;
+  const { config, repository } = deps;
   const bot = new Bot<AppContext>(config.TELEGRAM_BOT_TOKEN);
 
   bot.use(async (ctx, next) => {
@@ -78,9 +88,7 @@ export function createTelegramBot(deps: {
 
   bot.command("refresh", async (ctx) => {
     const summary = await refreshAllOrders({
-      repository,
-      printify,
-      gelato
+      repository
     });
     const settings = await repository.ensureSettings();
     for (const notification of summary.orderDetailsNotifications) {
@@ -100,7 +108,7 @@ export function createTelegramBot(deps: {
     await ctx.reply(
       [
         "Refresh complete.",
-        `Printify shop selected: ${summary.printifyShopSelected ? "yes" : "no"}`,
+        `Printify stores enabled: ${summary.printifyShopSelected ? "yes" : "no"}`,
         `Printify orders refreshed: ${summary.printifyOrders}`,
         `Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
         `Active tracked orders: ${openOrders.length}`,
@@ -111,7 +119,7 @@ export function createTelegramBot(deps: {
         reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
       }
     );
-    await ctx.reply(renderDigest(openOrders, changes, settings), {
+    await ctx.reply(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
       reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
     });
   });
@@ -133,6 +141,70 @@ export function createTelegramBot(deps: {
     });
   });
 
+  bot.on("message:text", async (ctx, next) => {
+    const chatId = ctx.chat.id;
+    const pending = pendingInputs.get(chatId);
+    const text = ctx.message.text.trim();
+    if (!pending || text.startsWith("/")) {
+      await next();
+      return;
+    }
+
+    pendingInputs.delete(chatId);
+    if (pending.type === "printify-key") {
+      const existingKeys = await repository.listProviderKeys("printify");
+      const key = await repository.saveProviderKey(
+        "printify",
+        `Printify ${existingKeys.length + 1}`,
+        text
+      );
+      const printify = new PrintifyClient(text);
+      const shops = await printify.listShops();
+      for (const shop of shops) {
+        await repository.upsertProviderStore({
+          keyId: key.id,
+          provider: "printify",
+          externalStoreId: String(shop.id),
+          name: shop.title,
+          enabled: false
+        });
+      }
+      const stores = await repository.listProviderStores("printify");
+      await ctx.reply("Printify key saved. Toggle the stores to capture orders for:", {
+        reply_markup: printifyShopsKeyboard(
+          stores.map((store) => ({
+            id: String(store.id),
+            title: `${store.name} (${store.externalStoreId})`,
+            enabled: store.enabled
+          }))
+        )
+      });
+      return;
+    }
+
+    if (pending.type === "gelato-key") {
+      const existingKeys = await repository.listProviderKeys("gelato");
+      await repository.saveProviderKey("gelato", `Gelato ${existingKeys.length + 1}`, text);
+      await ctx.reply("Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.");
+      return;
+    }
+
+    const [storeId, ...nameParts] = text.split("|").map((part) => part.trim());
+    const name = nameParts.join(" | ");
+    if (!storeId || !name) {
+      await ctx.reply("Store not saved. Send it as: store-id | Store Name");
+      return;
+    }
+    await repository.upsertProviderStore({
+      keyId: pending.keyId,
+      provider: "gelato",
+      externalStoreId: storeId,
+      name,
+      enabled: true
+    });
+    await ctx.reply(`Gelato store saved: ${name} (${storeId})`);
+  });
+
   bot.callbackQuery(/^order:view:(gelato|printify):(.+)$/, async (ctx) => {
     const [, provider, orderId] = ctx.match;
     const order = await loadOrder(repository, provider, orderId);
@@ -151,14 +223,25 @@ export function createTelegramBot(deps: {
     const [, provider, orderId] = ctx.match;
     let order: NormalizedOrder;
     if (provider === "printify") {
-      const shopId = await repository.getSelectedPrintifyShopId();
-      if (!shopId) {
-        await ctx.answerCallbackQuery({ text: "Select a Printify shop in settings first." });
+      const existing = await repository.getOrder("printify", orderId);
+      const store = (await repository.listEnabledProviderStores("printify")).find(
+        (candidate) => candidate.externalStoreId === existing?.shopId
+      );
+      if (!store) {
+        await ctx.answerCallbackQuery({ text: "Enable the Printify store in settings first." });
         return;
       }
-      order = await printify.getOrder(shopId, orderId);
+      order = await new PrintifyClient(store.apiKey).getOrder(store.externalStoreId, orderId);
     } else {
-      order = await gelato.getOrder(orderId);
+      const existing = await repository.getOrder("gelato", orderId);
+      const store = (await repository.listEnabledProviderStores("gelato")).find(
+        (candidate) => candidate.externalStoreId === existing?.shopId
+      );
+      if (!store) {
+        await ctx.answerCallbackQuery({ text: "Enable the Gelato store in settings first." });
+        return;
+      }
+      order = await new GelatoClient(store.apiKey, store.externalStoreId).getOrder(orderId);
     }
     await repository.upsertOrder(order, "poll");
     await ctx.editMessageText(renderOrderSummary(order), {
@@ -182,31 +265,62 @@ export function createTelegramBot(deps: {
   });
 
   bot.callbackQuery(/^settings:printify$/, async (ctx) => {
-    const shops = await printify.listShops();
-    await ctx.editMessageText("Select the Printify shop for this bot.", {
-      reply_markup: printifyShopsKeyboard(
-        shops.map((shop) => ({
-          id: String(shop.id),
-          title: `${shop.title} (${String(shop.id)})`
-        }))
-      )
+    const keys = await repository.listProviderKeys("printify");
+    const stores = await repository.listProviderStores("printify");
+    await ctx.editMessageText("Printify settings", {
+      reply_markup: providerKeysKeyboard("printify", keys, stores)
     });
   });
 
-  bot.callbackQuery(/^settings:printify:select:(.+)$/, async (ctx) => {
-    const [, shopId] = ctx.match;
-    const shops = await printify.listShops();
-    const selectedShop = shops.find((shop) => String(shop.id) === shopId);
-    const updated = await repository.updateSettings({
-      printifyShopId: shopId,
-      printifyShopName: selectedShop?.title ?? null
+  bot.callbackQuery(/^settings:gelato$/, async (ctx) => {
+    const keys = await repository.listProviderKeys("gelato");
+    const stores = await repository.listProviderStores("gelato");
+    await ctx.editMessageText("Gelato settings", {
+      reply_markup: providerKeysKeyboard("gelato", keys, stores)
     });
-    await ctx.editMessageText(
-      `Selected Printify shop ${selectedShop?.title ?? shopId}.`,
-      {
-      reply_markup: generalSettingsKeyboard(updated)
-      }
-    );
+  });
+
+  bot.callbackQuery(/^settings:(printify|gelato):key:add$/, async (ctx) => {
+    const provider = ctx.match[1] as "printify" | "gelato";
+    pendingInputs.set(ctx.chat?.id ?? ctx.callbackQuery.message?.chat.id ?? "unknown", {
+      type: provider === "printify" ? "printify-key" : "gelato-key"
+    });
+    await ctx.editMessageText(`Paste the ${provider === "printify" ? "Printify" : "Gelato"} API key in the next message.`);
+  });
+
+  bot.callbackQuery(/^settings:gelato:store:add:(\d+)$/, async (ctx) => {
+    const [, keyId] = ctx.match;
+    pendingInputs.set(ctx.chat?.id ?? ctx.callbackQuery.message?.chat.id ?? "unknown", {
+      type: "gelato-store",
+      keyId: Number(keyId)
+    });
+    await ctx.editMessageText("Send the Gelato store as: store-id | Store Name");
+  });
+
+  bot.callbackQuery(/^settings:store:toggle:(\d+)$/, async (ctx) => {
+    const [, storeId] = ctx.match;
+    const stores = await repository.listProviderStores();
+    const store = stores.find((candidate) => candidate.id === Number(storeId));
+    if (!store) {
+      await ctx.answerCallbackQuery({ text: "Store not found." });
+      return;
+    }
+    await repository.setProviderStoreEnabled(store.id, !store.enabled);
+    await ctx.answerCallbackQuery({ text: `${store.name} ${store.enabled ? "disabled" : "enabled"}.` });
+    const updatedStores = await repository.listProviderStores(store.provider);
+    const keys = await repository.listProviderKeys(store.provider);
+    await ctx.editMessageText(`${store.provider === "printify" ? "Printify" : "Gelato"} settings`, {
+      reply_markup:
+        store.provider === "printify"
+          ? printifyShopsKeyboard(
+              updatedStores.map((updatedStore) => ({
+                id: String(updatedStore.id),
+                title: `${updatedStore.name} (${updatedStore.externalStoreId})`,
+                enabled: updatedStore.enabled
+              }))
+            )
+          : providerKeysKeyboard("gelato", keys, updatedStores)
+    });
   });
 
   bot.callbackQuery(/^settings:digest:toggle$/, async (ctx) => {
@@ -227,9 +341,7 @@ export function createTelegramBot(deps: {
 
   bot.callbackQuery(/^orders:refresh$/, async (ctx) => {
     const summary = await refreshAllOrders({
-      repository,
-      printify,
-      gelato
+      repository
     });
 
     const settings = await repository.ensureSettings();
@@ -246,7 +358,7 @@ export function createTelegramBot(deps: {
     }
     const openOrders = await repository.listOpenOrders();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
-    await ctx.editMessageText(renderDigest(openOrders, changes, settings), {
+    await ctx.editMessageText(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
       reply_markup: ordersKeyboard(openOrders)
     });
     await ctx.answerCallbackQuery({ text: "Orders refreshed." });
@@ -298,9 +410,10 @@ export async function sendDigest(
   chatId: string,
   orders: NormalizedOrder[],
   changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>,
-  settings?: BotSettings
+  settings?: BotSettings,
+  storeNames: Record<string, string> = {}
 ) {
-  await bot.api.sendMessage(chatId, renderDigest(orders, changes, settings), {
+  await bot.api.sendMessage(chatId, renderDigest(orders, changes, settings, storeNames), {
     reply_markup: orders.length > 0 ? ordersKeyboard(orders) : undefined
   });
 }

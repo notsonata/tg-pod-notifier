@@ -3,10 +3,13 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { AppConfig } from "../config.js";
 import type {
   BotSettings,
-  NormalizedOrder
+  NormalizedOrder,
+  ProviderKeyConfig,
+  ProviderKeyName,
+  ProviderStoreConfig
 } from "../domain/types.js";
 import type { AppDatabase } from "./client.js";
-import { orderItems, orders, settings, statusEvents } from "./schema.js";
+import { orderItems, orders, providerKeys, providerStores, settings, statusEvents } from "./schema.js";
 
 function orderUniqueKey(order: Pick<NormalizedOrder, "provider" | "externalOrderId">): string {
   return `${order.provider}:${order.externalOrderId}`;
@@ -40,8 +43,6 @@ export class Repository {
 
     return {
       telegramChatId: row.telegramChatId,
-      printifyShopId: row.printifyShopId,
-      printifyShopName: row.printifyShopName,
       timezone: row.timezone,
       digestEnabled: row.digestEnabled,
       lastDigestSentAt: row.lastDigestSentAt
@@ -53,8 +54,6 @@ export class Repository {
     await this.db
       .update(settings)
       .set({
-        printifyShopId: partial.printifyShopId ?? current.printifyShopId,
-        printifyShopName: partial.printifyShopName ?? current.printifyShopName,
         timezone: partial.timezone ?? current.timezone,
         digestEnabled: partial.digestEnabled ?? current.digestEnabled,
         lastDigestSentAt: partial.lastDigestSentAt ?? current.lastDigestSentAt
@@ -62,6 +61,150 @@ export class Repository {
       .where(eq(settings.telegramChatId, this.config.AUTHORIZED_TELEGRAM_CHAT_ID));
 
     return this.ensureSettings();
+  }
+
+  async saveProviderKey(
+    provider: ProviderKeyName,
+    label: string,
+    apiKey: string
+  ): Promise<ProviderKeyConfig> {
+    const now = new Date().toISOString();
+    const existing = await this.db.query.providerKeys.findFirst({
+      where: and(eq(providerKeys.provider, provider), eq(providerKeys.label, label))
+    });
+
+    if (existing) {
+      await this.db
+        .update(providerKeys)
+        .set({
+          apiKey,
+          updatedAt: now
+        })
+        .where(eq(providerKeys.id, existing.id));
+    } else {
+      await this.db.insert(providerKeys).values({
+        provider,
+        label,
+        apiKey,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    const row = await this.db.query.providerKeys.findFirst({
+      where: and(eq(providerKeys.provider, provider), eq(providerKeys.label, label))
+    });
+    if (!row) {
+      throw new Error("Failed to save provider key");
+    }
+
+    return mapProviderKey(row);
+  }
+
+  async listProviderKeys(provider?: ProviderKeyName): Promise<ProviderKeyConfig[]> {
+    const rows = provider
+      ? await this.db.query.providerKeys.findMany({
+          where: eq(providerKeys.provider, provider),
+          orderBy: [desc(providerKeys.updatedAt)]
+        })
+      : await this.db.query.providerKeys.findMany({ orderBy: [desc(providerKeys.updatedAt)] });
+
+    return rows.map(mapProviderKey);
+  }
+
+  async getProviderKey(id: number): Promise<ProviderKeyConfig | null> {
+    const row = await this.db.query.providerKeys.findFirst({
+      where: eq(providerKeys.id, id)
+    });
+
+    return row ? mapProviderKey(row) : null;
+  }
+
+  async upsertProviderStore(input: {
+    keyId: number;
+    provider: ProviderKeyName;
+    externalStoreId: string;
+    name: string;
+    enabled: boolean;
+  }): Promise<ProviderStoreConfig> {
+    const existing = await this.db.query.providerStores.findFirst({
+      where: and(
+        eq(providerStores.keyId, input.keyId),
+        eq(providerStores.externalStoreId, input.externalStoreId)
+      )
+    });
+
+    const payload = {
+      keyId: input.keyId,
+      provider: input.provider,
+      externalStoreId: input.externalStoreId,
+      name: input.name,
+      enabled: input.enabled
+    };
+
+    if (existing) {
+      await this.db.update(providerStores).set(payload).where(eq(providerStores.id, existing.id));
+    } else {
+      await this.db.insert(providerStores).values(payload);
+    }
+
+    const row = await this.db.query.providerStores.findFirst({
+      where: and(
+        eq(providerStores.keyId, input.keyId),
+        eq(providerStores.externalStoreId, input.externalStoreId)
+      )
+    });
+    if (!row) {
+      throw new Error("Failed to save provider store");
+    }
+
+    const key = await this.getProviderKey(row.keyId);
+    if (!key) {
+      throw new Error("Provider key not found for store");
+    }
+
+    return mapProviderStore(row, key);
+  }
+
+  async setProviderStoreEnabled(storeId: number, enabled: boolean): Promise<void> {
+    await this.db.update(providerStores).set({ enabled }).where(eq(providerStores.id, storeId));
+  }
+
+  async listProviderStores(provider?: ProviderKeyName): Promise<ProviderStoreConfig[]> {
+    const rows = provider
+      ? await this.db.query.providerStores.findMany({
+          where: eq(providerStores.provider, provider),
+          orderBy: [desc(providerStores.id)]
+        })
+      : await this.db.query.providerStores.findMany({ orderBy: [desc(providerStores.id)] });
+
+    return this.mapProviderStores(rows);
+  }
+
+  async listEnabledProviderStores(provider?: ProviderKeyName): Promise<ProviderStoreConfig[]> {
+    const rows = provider
+      ? await this.db.query.providerStores.findMany({
+          where: and(eq(providerStores.provider, provider), eq(providerStores.enabled, true)),
+          orderBy: [desc(providerStores.id)]
+        })
+      : await this.db.query.providerStores.findMany({
+          where: eq(providerStores.enabled, true),
+          orderBy: [desc(providerStores.id)]
+        });
+
+    return this.mapProviderStores(rows);
+  }
+
+  private async mapProviderStores(
+    rows: Array<typeof providerStores.$inferSelect>
+  ): Promise<ProviderStoreConfig[]> {
+    const keys = await this.listProviderKeys();
+    const keyById = new Map(keys.map((key) => [key.id, key]));
+
+    return rows.flatMap((row) => {
+      const key = keyById.get(row.keyId);
+      return key ? [mapProviderStore(row, key)] : [];
+    });
   }
 
   async upsertOrder(
@@ -301,8 +444,31 @@ export class Repository {
     }));
   }
 
-  async getSelectedPrintifyShopId(): Promise<string | null> {
-    const current = await this.ensureSettings();
-    return current.printifyShopId ?? this.config.PRINTIFY_SHOP_ID ?? null;
-  }
+}
+
+function mapProviderKey(row: typeof providerKeys.$inferSelect): ProviderKeyConfig {
+  return {
+    id: row.id,
+    provider: row.provider as ProviderKeyName,
+    label: row.label,
+    apiKey: row.apiKey,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+function mapProviderStore(
+  row: typeof providerStores.$inferSelect,
+  key: ProviderKeyConfig
+): ProviderStoreConfig {
+  return {
+    id: row.id,
+    keyId: row.keyId,
+    provider: row.provider as ProviderKeyName,
+    label: key.label,
+    apiKey: key.apiKey,
+    externalStoreId: row.externalStoreId,
+    name: row.name,
+    enabled: row.enabled
+  };
 }

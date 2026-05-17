@@ -47,7 +47,7 @@ No open orders found.
 
 ```text
 Refresh complete.
-Printify shop selected: <yes|no>
+Printify stores enabled: <yes|no>
 Printify orders refreshed: <count>
 Gelato tracked orders refreshed: <count>
 Active tracked orders: <count>
@@ -69,9 +69,7 @@ Settings
 
 ## Order Details
 
-Used for individual order detail views for every provider.
-
-Automatically sent only when polling finds a new order or an order with a problem status.
+Used for individual order alerts and order detail views for every provider.
 
 ```text
 Order: <external order id>
@@ -128,49 +126,33 @@ Updated: <updated ISO timestamp>
 
 The `Updated` line is omitted when no update timestamp exists.
 
-## Polling Behavior
-
-The bot uses provider API polling as the source of truth.
-
-- Every 30 minutes, the bot checks provider APIs for new orders and problem statuses.
-- New orders receive an Order Details message.
-- Orders that move into a problem status receive an Order Details message.
-- Every 6 hours, the bot refreshes current not-delivered orders and sends the Order Digest.
-
 ## Digest
 
-Used for the 6-hour order digest, manual refresh digest output, and the inline `Refresh all` action.
+Used for daily digests, manual refresh digest output, and the inline `Refresh all` action.
 
 ```text
-Order Digest
+Daily order digest
 
-Printify
-<store label>
+Active orders: <count>
+<provider>: <count>
 
-Order: <external order id>
-Customer: <customer name|Unknown>
-Status: <mapped Printify-style status>
+Stuck alerts:
+- <severity>: <alert message>
 
-Order: <external order id>
-Customer: <customer name|Unknown>
-Status: <mapped Printify-style status> <- <previous mapped status>
-
-Gelato
-<store label>
-
-Order: <external order id>
-Customer: <customer name|Unknown>
-Status: <mapped Printify-style status>
+Recent changes:
+- <provider>:<order id> -> <raw status>
 ```
 
-The previous status marker is only shown when the order changed status since the last digest.
-
-When there are no active orders:
+When there are no active alerts:
 
 ```text
-Order Digest
+Stuck alerts: none
+```
 
-No active orders.
+When there are no recent changes:
+
+```text
+Recent changes: none
 ```
 
 ## Settings Screens
@@ -187,16 +169,44 @@ Digest settings
 Settings
 ```
 
-### Printify Shop Selection
+### Printify Settings
 
 ```text
-Select the Printify shop for this bot.
+Printify settings
 ```
 
-### Printify Shop Selected
+```text
+Paste the Printify API key in the next message.
+```
 
 ```text
-Selected Printify shop <shop title or shop id>.
+Printify key saved. Toggle the stores to capture orders for:
+```
+
+### Gelato Settings
+
+```text
+Gelato settings
+```
+
+```text
+Paste the Gelato API key in the next message.
+```
+
+```text
+Gelato key saved. Use Settings > Gelato > Add Gelato store to attach store IDs.
+```
+
+```text
+Send the Gelato store as: store-id | Store Name
+```
+
+```text
+Store not saved. Send it as: store-id | Store Name
+```
+
+```text
+Gelato store saved: <store name> (<store id>)
 ```
 
 ## Callback Popups
@@ -205,10 +215,14 @@ These are short Telegram callback-query popup messages.
 
 ```text
 Order not found.
-Select a Printify shop in settings first.
+Enable the Printify store in settings first.
+Enable the Gelato store in settings first.
 Order refreshed.
 Provider link is not available for this order.
 Orders refreshed.
+Store not found.
+<store name> enabled.
+<store name> disabled.
 ```
 
 ## Inline Button Labels
@@ -242,14 +256,17 @@ Enable digest
 
 ```text
 Digest
-Printify <shop name>
-Printify Shop <shop id>
-Select Printify Shop
+Printify
+Gelato
 ```
 
-### Printify Shop Selection
+### Provider Settings
 
 ```text
-<shop title> (<shop id>)
+Add Printify key
+Add Gelato key
+Add Gelato store
+ON <store name>
+OFF <store name>
 Back
 ```

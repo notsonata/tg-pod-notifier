@@ -78,10 +78,6 @@ cp .env.example .env
 TELEGRAM_BOT_TOKEN=
 AUTHORIZED_TELEGRAM_CHAT_ID=
 CLOUDFLARE_TUNNEL_TOKEN=
-GELATO_API_KEY=
-GELATO_STORE_ID=
-PRINTIFY_API_TOKEN=
-PRINTIFY_SHOP_ID=
 DATABASE_PATH=./data/tg-notifier.sqlite
 PORT=38127
 DEFAULT_TIMEZONE=UTC
@@ -161,6 +157,7 @@ docker compose up --build
 ```
 
 The SQLite database is stored in the local `./data` directory and mounted into the container.
+`data/` is gitignored so local SQLite databases and plaintext provider API keys are not committed.
 
 ### Compose services
 
@@ -256,6 +253,8 @@ SQLite tables used by the service:
 - `orders`
 - `order_items`
 - `status_events`
+- `provider_keys`
+- `provider_stores`
 - `settings`
 
 The schema is defined in [src/db/schema.ts](/Users/angelo/Projects/Work/tg-notifier/src/db/schema.ts).

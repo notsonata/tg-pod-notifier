@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 
-import type { BotSettings, NormalizedOrder } from "../domain/types.js";
+import type { BotSettings, NormalizedOrder, ProviderKeyConfig, ProviderStoreConfig } from "../domain/types.js";
 
 export function ordersKeyboard(orders: NormalizedOrder[]): InlineKeyboard {
   const keyboard = new InlineKeyboard();
@@ -30,25 +30,46 @@ export function digestSettingsKeyboard(settings: BotSettings): InlineKeyboard {
 }
 
 export function generalSettingsKeyboard(settings: BotSettings): InlineKeyboard {
+  void settings;
   return new InlineKeyboard()
     .text("Digest", "settings:digest")
     .row()
-    .text(
-      settings.printifyShopName
-        ? `Printify ${settings.printifyShopName}`
-        : settings.printifyShopId
-          ? `Printify Shop ${settings.printifyShopId}`
-        : "Select Printify Shop",
-      "settings:printify"
-    );
+    .text("Printify", "settings:printify")
+    .text("Gelato", "settings:gelato");
 }
 
 export function printifyShopsKeyboard(
-  shops: Array<{ id: string; title: string }>
+  shops: Array<{ id: string; title: string; enabled: boolean }>
 ): InlineKeyboard {
   const keyboard = new InlineKeyboard();
   for (const shop of shops.slice(0, 10)) {
-    keyboard.text(shop.title, `settings:printify:select:${shop.id}`).row();
+    keyboard.text(`${shop.enabled ? "ON" : "OFF"} ${shop.title}`, `settings:store:toggle:${shop.id}`).row();
   }
   return keyboard.text("Back", "settings:menu");
+}
+
+export function providerKeysKeyboard(
+  provider: "gelato" | "printify",
+  keys: ProviderKeyConfig[],
+  stores: ProviderStoreConfig[]
+): InlineKeyboard {
+  const keyboard = new InlineKeyboard().text(
+    provider === "printify" ? "Add Printify key" : "Add Gelato key",
+    `settings:${provider}:key:add`
+  );
+
+  if (provider === "gelato") {
+    for (const key of keys) {
+      keyboard.row().text(`Add store to ${key.label}`, `settings:gelato:store:add:${key.id}`);
+    }
+  }
+
+  for (const store of stores.slice(0, 10)) {
+    keyboard.row().text(
+      `${store.enabled ? "ON" : "OFF"} ${store.name}`,
+      `settings:store:toggle:${store.id}`
+    );
+  }
+
+  return keyboard.row().text("Back", "settings:menu");
 }
