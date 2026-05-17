@@ -1,4 +1,4 @@
-import type { NormalizedOrder, NormalizedOrderEvent } from "../domain/types.js";
+import type { NormalizedOrder } from "../domain/types.js";
 
 interface GelatoTrackingCode {
   parcelNumber?: number;
@@ -37,27 +37,6 @@ interface GelatoOrderPayload {
   };
 }
 
-interface GelatoWebhookPayload {
-  id: string;
-  event: string;
-  orderId: string;
-  orderReferenceId: string;
-  fulfillmentStatus?: string;
-  status?: string;
-  comment?: string;
-  itemReferenceId?: string;
-  trackingCode?: string;
-  trackingUrl?: string;
-  minDeliveryDate?: string;
-  maxDeliveryDate?: string;
-  created?: string;
-  items?: Array<{
-    itemReferenceId?: string;
-    fulfillmentStatus?: string;
-    fulfillments?: unknown[];
-  }>;
-}
-
 function asIso(value: string | undefined): string | null {
   return value ? new Date(value).toISOString() : null;
 }
@@ -74,6 +53,8 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
     referenceOrderId: payload.orderReferenceId,
     shopId: null,
     status,
+    sentToProductionAt: null,
+    totalCost: null,
     createdAt: asIso(payload.createdAt),
     updatedAt: asIso(payload.updatedAt),
     customer: {
@@ -108,19 +89,6 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
     providerUrl: null,
     etaMinAt: null,
     etaMaxAt: null,
-    raw: payload
-  };
-}
-
-export function normalizeGelatoWebhook(payload: GelatoWebhookPayload): NormalizedOrderEvent {
-  return {
-    provider: "gelato",
-    eventId: payload.id,
-    orderId: payload.orderId,
-    referenceOrderId: payload.orderReferenceId,
-    status: payload.fulfillmentStatus ?? payload.status ?? payload.event,
-    occurredAt: asIso(payload.created),
-    comment: payload.comment ?? null,
     raw: payload
   };
 }

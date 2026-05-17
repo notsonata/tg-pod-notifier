@@ -1,27 +1,23 @@
 import { Bot, type Context } from "grammy";
 
 import type { AppConfig } from "../config.js";
-import { evaluateOrderAlert } from "../domain/alerts.js";
 import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 import { GelatoClient } from "../providers/gelato.js";
 import { PrintifyClient } from "../providers/printify.js";
 import { Repository } from "../db/repository.js";
 import { refreshAllOrders } from "../jobs/sync.js";
-import { runAlertScan } from "../jobs/scheduler.js";
 import { isAuthorizedGroupChat } from "./access-control.js";
 import {
   digestSettingsKeyboard,
   generalSettingsKeyboard,
   orderKeyboard,
   ordersKeyboard,
-  printifyShopsKeyboard,
-  privacySettingsKeyboard
+  printifyShopsKeyboard
 } from "./keyboards.js";
 import {
   renderDigest,
   renderOrderDetails,
-  renderOrderSummary,
-  type OrderAlertKind
+  renderOrderSummary
 } from "./render.js";
 
 type AppContext = Context;
@@ -33,8 +29,7 @@ export const TELEGRAM_COMMANDS = [
   { command: "orders", description: "List active tracked orders" },
   { command: "refresh", description: "Refresh provider order data now" },
   { command: "digest", description: "View digest settings" },
-  { command: "settings", description: "Open bot settings" },
-  { command: "privacy", description: "Configure order detail visibility" }
+  { command: "settings", description: "Open bot settings" }
 ] as const;
 
 async function loadOrder(
@@ -68,7 +63,7 @@ export function createTelegramBot(deps: {
   });
 
   bot.command("help", async (ctx) => {
-    await ctx.reply("Commands: /orders /digest /settings /privacy");
+    await ctx.reply("Commands: /orders /digest /settings");
   });
 
   bot.command("orders", async (ctx) => {
@@ -88,15 +83,18 @@ export function createTelegramBot(deps: {
       gelato
     });
     const settings = await repository.ensureSettings();
-    for (const fulfilled of summary.newlyFulfilled) {
-      const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+    for (const notification of summary.orderDetailsNotifications) {
+      const order = await repository.getOrder(notification.provider, notification.externalOrderId);
       if (order) {
-        await sendOrderAlert(bot, settings.telegramChatId, order, settings, "fulfilled");
+        await sendOrderAlert(
+          bot,
+          settings.telegramChatId,
+          order,
+          settings
+        );
       }
     }
-    await runAlertScan(repository, bot, settings);
     const openOrders = await repository.listOpenOrders();
-    const alerts = await repository.listActiveAlerts();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
 
     await ctx.reply(
@@ -106,9 +104,6 @@ export function createTelegramBot(deps: {
         `Printify orders refreshed: ${summary.printifyOrders}`,
         `Gelato tracked orders refreshed: ${summary.gelatoOrders}`,
         `Active tracked orders: ${openOrders.length}`,
-        summary.gelatoOrders === 0
-          ? "Gelato note: active order discovery depends on incoming webhooks or previously known order IDs."
-          : null
       ]
         .filter(Boolean)
         .join("\n"),
@@ -116,13 +111,15 @@ export function createTelegramBot(deps: {
         reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
       }
     );
-    await ctx.reply(renderDigest(openOrders, alerts, changes));
+    await ctx.reply(renderDigest(openOrders, changes, settings), {
+      reply_markup: openOrders.length > 0 ? ordersKeyboard(openOrders) : undefined
+    });
   });
 
   bot.command("digest", async (ctx) => {
     const settings = await repository.ensureSettings();
     await ctx.reply(
-      `Digest is ${settings.digestEnabled ? "enabled" : "disabled"} at ${String(settings.digestHour).padStart(2, "0")}:${String(settings.digestMinute).padStart(2, "0")} ${settings.timezone}`,
+      `Order digest is ${settings.digestEnabled ? "enabled" : "disabled"}.`,
       {
         reply_markup: digestSettingsKeyboard(settings)
       }
@@ -133,13 +130,6 @@ export function createTelegramBot(deps: {
     const settings = await repository.ensureSettings();
     await ctx.reply("Settings", {
       reply_markup: generalSettingsKeyboard(settings)
-    });
-  });
-
-  bot.command("privacy", async (ctx) => {
-    const settings = await repository.ensureSettings();
-    await ctx.reply("Privacy settings", {
-      reply_markup: privacySettingsKeyboard(settings)
     });
   });
 
@@ -184,13 +174,6 @@ export function createTelegramBot(deps: {
     });
   });
 
-  bot.callbackQuery(/^settings:privacy$/, async (ctx) => {
-    const current = await repository.ensureSettings();
-    await ctx.editMessageText("Privacy settings", {
-      reply_markup: privacySettingsKeyboard(current)
-    });
-  });
-
   bot.callbackQuery(/^settings:menu$/, async (ctx) => {
     const settings = await repository.ensureSettings();
     await ctx.editMessageText("Settings", {
@@ -226,28 +209,6 @@ export function createTelegramBot(deps: {
     );
   });
 
-  bot.callbackQuery(/^settings:stale-days$/, async (ctx) => {
-    const current = await repository.ensureSettings();
-    const nextDays = current.thresholds.staleDays === 1
-      ? 3
-      : current.thresholds.staleDays === 3
-        ? 5
-        : current.thresholds.staleDays === 5
-          ? 7
-          : 1;
-    const updated = await repository.updateSettings({
-      thresholds: {
-        staleDays: nextDays
-      }
-    });
-    await ctx.editMessageText(`Settings`, {
-      reply_markup: generalSettingsKeyboard(updated)
-    });
-    await ctx.answerCallbackQuery({
-      text: `Stale threshold set to ${nextDays} day(s).`
-    });
-  });
-
   bot.callbackQuery(/^settings:digest:toggle$/, async (ctx) => {
     const current = await repository.ensureSettings();
     const updated = await repository.updateSettings({
@@ -255,67 +216,6 @@ export function createTelegramBot(deps: {
     });
     await ctx.editMessageText("Digest settings", {
       reply_markup: digestSettingsKeyboard(updated)
-    });
-  });
-
-  bot.callbackQuery(/^settings:digest:scope$/, async (ctx) => {
-    const current = await repository.ensureSettings();
-    const updated = await repository.updateSettings({
-      digestStuckOnly: !current.digestStuckOnly
-    });
-    await ctx.editMessageText("Digest settings", {
-      reply_markup: digestSettingsKeyboard(updated)
-    });
-  });
-
-  bot.callbackQuery(/^settings:digest:time:(\d+):(\d+)$/, async (ctx) => {
-    const [, hour, minute] = ctx.match;
-    const updated = await repository.updateSettings({
-      digestHour: Number(hour),
-      digestMinute: Number(minute)
-    });
-    await ctx.editMessageText("Digest settings", {
-      reply_markup: digestSettingsKeyboard(updated)
-    });
-  });
-
-  bot.callbackQuery(/^settings:privacy:(name|email|phone|address)$/, async (ctx) => {
-    const current = await repository.ensureSettings();
-    const field = ctx.match[1];
-    const updated = await repository.updateSettings({
-      piiName: field === "name" ? !current.piiName : current.piiName,
-      piiEmail: field === "email" ? !current.piiEmail : current.piiEmail,
-      piiPhone: field === "phone" ? !current.piiPhone : current.piiPhone,
-      piiAddress: field === "address" ? !current.piiAddress : current.piiAddress
-    });
-    await ctx.editMessageText("Privacy settings", {
-      reply_markup: privacySettingsKeyboard(updated)
-    });
-  });
-
-  bot.callbackQuery(/^order:ack:(gelato|printify):(.+)$/, async (ctx) => {
-    const [, provider, orderId] = ctx.match;
-    const updated = await repository.setLatestAlertStateForOrder(
-      provider,
-      orderId,
-      "acknowledged"
-    );
-    await ctx.answerCallbackQuery({
-      text: updated ? "Alert acknowledged." : "No active alert for this order."
-    });
-  });
-
-  bot.callbackQuery(/^order:snooze:(gelato|printify):(.+):(\d+)$/, async (ctx) => {
-    const [, provider, orderId, hours] = ctx.match;
-    const snoozedUntil = new Date(Date.now() + Number(hours) * 60 * 60 * 1000).toISOString();
-    const updated = await repository.setLatestAlertStateForOrder(
-      provider,
-      orderId,
-      "snoozed",
-      snoozedUntil
-    );
-    await ctx.answerCallbackQuery({
-      text: updated ? `Alert snoozed for ${hours}h.` : "No active alert for this order."
     });
   });
 
@@ -333,17 +233,20 @@ export function createTelegramBot(deps: {
     });
 
     const settings = await repository.ensureSettings();
-    for (const fulfilled of summary.newlyFulfilled) {
-      const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+    for (const notification of summary.orderDetailsNotifications) {
+      const order = await repository.getOrder(notification.provider, notification.externalOrderId);
       if (order) {
-        await sendOrderAlert(bot, settings.telegramChatId, order, settings, "fulfilled");
+        await sendOrderAlert(
+          bot,
+          settings.telegramChatId,
+          order,
+          settings
+        );
       }
     }
-    await runAlertScan(repository, bot, settings);
     const openOrders = await repository.listOpenOrders();
-    const alerts = await repository.listActiveAlerts();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
-    await ctx.editMessageText(renderDigest(openOrders, alerts, changes), {
+    await ctx.editMessageText(renderDigest(openOrders, changes, settings), {
       reply_markup: ordersKeyboard(openOrders)
     });
     await ctx.answerCallbackQuery({ text: "Orders refreshed." });
@@ -383,10 +286,9 @@ export async function sendOrderAlert(
   bot: Bot,
   chatId: string,
   order: NormalizedOrder,
-  settings: BotSettings,
-  kind: OrderAlertKind = "info"
+  settings: BotSettings
 ) {
-  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings, kind), {
+  await bot.api.sendMessage(chatId, renderOrderDetails(order, settings), {
     reply_markup: orderKeyboard(order)
   });
 }
@@ -395,18 +297,10 @@ export async function sendDigest(
   bot: Bot,
   chatId: string,
   orders: NormalizedOrder[],
-  alerts: Array<{ orderUniqueKey: string; severity: string; message: string }>,
-  changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>
+  changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>,
+  settings?: BotSettings
 ) {
-  await bot.api.sendMessage(chatId, renderDigest(orders, alerts, changes));
-}
-
-export async function findAlertForOrder(
-  order: NormalizedOrder,
-  settings: BotSettings
-) {
-  return evaluateOrderAlert(order, {
-    nowIso: new Date().toISOString(),
-    staleDays: settings.thresholds.staleDays
+  await bot.api.sendMessage(chatId, renderDigest(orders, changes, settings), {
+    reply_markup: orders.length > 0 ? ordersKeyboard(orders) : undefined
   });
 }

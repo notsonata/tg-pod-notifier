@@ -1,50 +1,80 @@
 import type { BotSettings, NormalizedOrder } from "../domain/types.js";
 
-export type OrderAlertKind = "new" | "stale" | "delayed" | "fulfilled" | "info";
+const STATUS_LABELS: Record<string, string> = {
+  pending: "On hold",
+  "on-hold": "On hold",
+  created: "On hold",
+  "on-hold-submit-order": "On hold: Submit order",
+  "payment-not-received": "On hold: Action required",
+  "out-of-stock": "On hold: Action required",
+  "sending-to-production": "Sending to production",
+  "sent-to-production": "Sending to production",
+  "in-production": "In production",
+  in_production: "In production",
+  printed: "In production",
+  "has-issues": "Has issues",
+  error: "Has issues",
+  failed: "Has issues",
+  canceled: "Canceled",
+  cancelled: "Canceled",
+  fulfilled: "Ready to ship",
+  "ready-to-ship": "Ready to ship",
+  passed: "Ready to ship",
+  shipped: "Shipped",
+  "on-the-way": "On the way",
+  in_transit: "On the way",
+  "available-for-pickup": "Available for pickup",
+  "out-for-delivery": "Out for delivery",
+  "delivery-attempt": "Delivery attempt",
+  "shipping-issue": "Shipping issue",
+  exception: "Shipping issue",
+  "return-to-sender": "Return to sender",
+  returned: "Return to sender",
+  delivered: "Delivered"
+};
 
-function customerSummary(order: NormalizedOrder, settings: BotSettings): string[] {
-  const lines: string[] = [];
-  if (settings.piiName && order.customer.name) {
-    lines.push(`Name: ${order.customer.name}`);
-  }
-  if (order.customer.city || order.customer.country) {
-    lines.push(
-      `Location: ${[order.customer.city, order.customer.region, order.customer.country]
-        .filter(Boolean)
-        .join(", ")}`
-    );
-  }
-  if (settings.piiEmail && order.customer.email) {
-    lines.push(`Email: ${order.customer.email}`);
-  }
-  if (settings.piiPhone && order.customer.phone) {
-    lines.push(`Phone: ${order.customer.phone}`);
-  }
-  if (settings.piiAddress && (order.customer.address1 || order.customer.address2)) {
-    lines.push(
-      `Address: ${[order.customer.address1, order.customer.address2, order.customer.postalCode]
-        .filter(Boolean)
-        .join(", ")}`
-    );
-  }
-
-  return lines;
+function normalizeStatusKey(status: string): string {
+  return status.trim().toLowerCase().replace(/\s+/g, "-");
 }
 
-function alertHeading(kind: OrderAlertKind): string {
-  if (kind === "new") {
-    return "🟢 New Order";
+function displayStatus(status: string): string {
+  return STATUS_LABELS[normalizeStatusKey(status)] ?? "Unknown";
+}
+
+function formatProductionDate(value: string | null): string {
+  if (!value) {
+    return "Pending";
   }
-  if (kind === "stale") {
-    return "🟠 Stale Order";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Pending";
   }
-  if (kind === "delayed") {
-    return "🔴 ⚠️ DELAYED Order ⚠️";
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "2-digit",
+    timeZone: "UTC"
+  }).format(date);
+}
+
+function formatTotalCost(order: NormalizedOrder): string {
+  if (!order.totalCost) {
+    return "Pending";
   }
-  if (kind === "fulfilled") {
-    return "✅ Fulfilled Order";
+
+  return `${order.totalCost.currency} ${(order.totalCost.amount / 100).toFixed(2)}`;
+}
+
+function formatTracking(order: NormalizedOrder): string {
+  if (order.trackingLinks.length === 0) {
+    return "Pending";
   }
-  return "ℹ️ Order Update";
+
+  return order.trackingLinks
+    .map((tracking) => tracking.trackingUrl ?? tracking.trackingNumber)
+    .join("\n");
 }
 
 export function renderOrderSummary(order: NormalizedOrder): string {
@@ -60,75 +90,70 @@ export function renderOrderSummary(order: NormalizedOrder): string {
 
 export function renderOrderDetails(
   order: NormalizedOrder,
-  settings: BotSettings,
-  kind: OrderAlertKind = "info"
+  _settings: BotSettings
 ): string {
-  const providerLabel = order.provider === "printify" ? "Printify" : "Gelato";
-  const storeLabel =
-    order.provider === "printify" && settings.printifyShopName
-      ? settings.printifyShopName
-      : order.shopId ?? "Unknown";
-
-  const identityBlock = [
-    alertHeading(kind),
-    "",
-    `[${providerLabel}]`,
-    `[Store ${storeLabel}]`,
-    `Order ID: ${order.externalOrderId}`
-  ].join("\n");
-
-  const statusBlock = [
-    `Status: ${order.status}`,
-    order.createdAt ? `Created: ${order.createdAt}` : null,
-    order.updatedAt ? `Updated: ${order.updatedAt}` : null,
-    order.etaMaxAt ? `Expected by: ${order.etaMaxAt}` : null
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  const customerBlock = customerSummary(order, settings).join("\n");
-
   return [
-    identityBlock,
-    statusBlock,
-    customerBlock,
-    order.items.length > 0
-      ? `Items:\n${order.items
-          .map((item) => `- ${item.title} x${item.quantity} [${item.status}]`)
-          .join("\n")}`
-      : null,
-    order.trackingLinks.length > 0
-      ? `Tracking:\n${order.trackingLinks
-          .map((tracking) => `- ${tracking.trackingNumber}${tracking.trackingUrl ? ` ${tracking.trackingUrl}` : ""}`)
-          .join("\n")}`
-      : null
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+    `Order: ${order.externalOrderId}`,
+    `Sent to production: ${formatProductionDate(order.sentToProductionAt)}`,
+    `Customer: ${order.customer.name ?? "Unknown"}`,
+    `Total cost: ${formatTotalCost(order)}`,
+    `Tracking: ${formatTracking(order)}`,
+    `Status: ${displayStatus(order.status)}`
+  ].join("\n");
 }
 
 export function renderDigest(
   orders: NormalizedOrder[],
-  alerts: Array<{ orderUniqueKey: string; severity: string; message: string }>,
-  changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>
+  changes: Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>,
+  settings?: BotSettings
 ): string {
-  const activeByProvider = new Map<string, number>();
-  for (const order of orders) {
-    activeByProvider.set(order.provider, (activeByProvider.get(order.provider) ?? 0) + 1);
+  if (orders.length === 0) {
+    return "Order Digest\n\nNo active orders.";
   }
 
-  return [
-    "Daily order digest",
-    `Active orders: ${orders.length}`,
-    ...Array.from(activeByProvider.entries()).map(([provider, count]) => `${provider}: ${count}`),
-    alerts.length > 0
-      ? `Stuck alerts:\n${alerts.map((alert) => `- ${alert.severity}: ${alert.message}`).join("\n")}`
-      : "Stuck alerts: none",
-    changes.length > 0
-      ? `Recent changes:\n${changes
-          .slice(0, 10)
-          .map((change) => `- ${change.orderUniqueKey} -> ${change.status}`)
-          .join("\n")}`
-      : "Recent changes: none"
-  ].join("\n\n");
+  const previousStatusByOrder = new Map(changes.map((change) => [change.orderUniqueKey, change.status]));
+  const lines = ["Order Digest"];
+  const providers: NormalizedOrder["provider"][] = ["printify", "gelato"];
+
+  for (const provider of providers) {
+    const providerOrders = orders.filter((order) => order.provider === provider);
+    if (providerOrders.length === 0) {
+      continue;
+    }
+
+    lines.push("", provider === "printify" ? "Printify" : "Gelato");
+    lines.push(providerStoreLabel(provider, providerOrders, settings));
+
+    for (const order of providerOrders) {
+      const uniqueKey = `${order.provider}:${order.externalOrderId}`;
+      const currentStatus = displayStatus(order.status);
+      const previousStatus = previousStatusByOrder.get(uniqueKey);
+      const previousStatusLabel = previousStatus ? displayStatus(previousStatus) : null;
+      const statusLine =
+        previousStatusLabel && previousStatusLabel !== currentStatus
+          ? `Status: ${currentStatus} <- ${previousStatusLabel}`
+          : `Status: ${currentStatus}`;
+
+      lines.push(
+        "",
+        `Order: ${order.externalOrderId}`,
+        `Customer: ${order.customer.name ?? "Unknown"}`,
+        statusLine
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function providerStoreLabel(
+  provider: NormalizedOrder["provider"],
+  orders: NormalizedOrder[],
+  settings?: BotSettings
+): string {
+  if (provider === "printify") {
+    return settings?.printifyShopName ?? settings?.printifyShopId ?? orders[0]?.shopId ?? "Unknown";
+  }
+
+  return orders[0]?.shopId ?? "Unknown";
 }

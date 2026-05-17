@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 
 import {
   normalizePrintifyOrder,
-  normalizePrintifyWebhook,
   type PrintifyShop
 } from "../src/providers/printify.js";
 
@@ -13,6 +12,7 @@ describe("Printify normalization", () => {
       created_at: "2025-01-01T00:00:00.000Z",
       updated_at: "2025-01-01T01:00:00.000Z",
       status: "pending",
+      sent_to_production_at: "2025-01-01 02:00:00+00:00",
       total_price: 2500,
       total_shipping: 500,
       line_items: [
@@ -49,6 +49,11 @@ describe("Printify normalization", () => {
 
     expect(normalized.provider).toBe("printify");
     expect(normalized.externalOrderId).toBe("order-1");
+    expect(normalized.sentToProductionAt).toBe("2025-01-01T02:00:00.000Z");
+    expect(normalized.totalCost).toEqual({
+      amount: 2500,
+      currency: "USD"
+    });
     expect(normalized.items).toHaveLength(1);
     expect(normalized.trackingLinks).toEqual([
       {
@@ -57,31 +62,6 @@ describe("Printify normalization", () => {
         trackingUrl: "https://tracking.example/1"
       }
     ]);
-  });
-
-  test("normalizes a shipment webhook into a status transition", () => {
-    const event = normalizePrintifyWebhook({
-      id: "evt-1",
-      type: "order:shipment:created",
-      created_at: "2025-01-03 00:00:00+00:00",
-      resource: {
-        id: "order-1",
-        type: "order",
-        data: {
-          shop_id: 123,
-          shipped_at: "2025-01-03 00:00:00+00:00",
-          carrier: {
-            code: "USPS",
-            tracking_number: "TRACK-1"
-          },
-          skus: ["SKU-1"]
-        }
-      }
-    });
-
-    expect(event.eventId).toBe("evt-1");
-    expect(event.orderId).toBe("order-1");
-    expect(event.status).toBe("shipped");
   });
 
   test("preserves the provider shop id when normalizing an order", () => {

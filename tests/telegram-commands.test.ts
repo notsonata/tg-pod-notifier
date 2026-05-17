@@ -10,8 +10,7 @@ describe("TELEGRAM_COMMANDS", () => {
       "orders",
       "refresh",
       "digest",
-      "settings",
-      "privacy"
+      "settings"
     ]);
   });
 

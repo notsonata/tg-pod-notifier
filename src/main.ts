@@ -2,7 +2,7 @@ import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/client.js";
 import { Repository } from "./db/repository.js";
 import { createServer } from "./http/server.js";
-import { runAlertScan, startScheduler } from "./jobs/scheduler.js";
+import { startScheduler } from "./jobs/scheduler.js";
 import { refreshAllOrders } from "./jobs/sync.js";
 import { GelatoClient } from "./providers/gelato.js";
 import { PrintifyClient } from "./providers/printify.js";
@@ -54,13 +54,17 @@ async function main() {
     gelato
   });
   const latestSettings = await repository.ensureSettings();
-  for (const fulfilled of summary.newlyFulfilled) {
-    const order = await repository.getOrder(fulfilled.provider, fulfilled.externalOrderId);
+  for (const notification of summary.orderDetailsNotifications) {
+    const order = await repository.getOrder(notification.provider, notification.externalOrderId);
     if (order) {
-      await sendOrderAlert(bot, latestSettings.telegramChatId, order, latestSettings, "fulfilled");
+      await sendOrderAlert(
+        bot,
+        latestSettings.telegramChatId,
+        order,
+        latestSettings
+      );
     }
   }
-  await runAlertScan(repository, bot, latestSettings);
   void bot.start({
     onStart: () => {
       console.log("Telegram bot polling started.");

@@ -1,4 +1,4 @@
-import type { NormalizedOrder, NormalizedOrderEvent } from "../domain/types.js";
+import type { NormalizedOrder } from "../domain/types.js";
 
 export interface PrintifyShop {
   id: number | string;
@@ -28,7 +28,9 @@ interface PrintifyOrderPayload {
   created_at?: string;
   updated_at?: string;
   status?: string;
+  sent_to_production_at?: string;
   total_price?: number;
+  currency?: string;
   total_shipping?: number;
   line_items?: PrintifyLineItem[];
   shipments?: Array<PrintifyShipment & { shipped_at?: string; delivered_at?: string | null }>;
@@ -46,45 +48,8 @@ interface PrintifyOrderPayload {
   };
 }
 
-interface PrintifyWebhookPayload {
-  id: string;
-  type: string;
-  created_at?: string;
-  resource: {
-    id: string;
-    type: string;
-      data?: {
-        shop_id?: number;
-        status?: string;
-        shipped_at?: string;
-        delivered_at?: string;
-        skus?: string[];
-        carrier?: {
-          code?: string;
-          tracking_number?: string;
-      };
-    } | null;
-  };
-}
-
 function asIso(value: string | undefined): string | null {
   return value ? new Date(value).toISOString() : null;
-}
-
-function statusFromWebhook(type: string, status: string | undefined): string {
-  if (type === "order:shipment:created") {
-    return "shipped";
-  }
-
-  if (type === "order:shipment:delivered") {
-    return "delivered";
-  }
-
-  if (type === "order:sent-to-production") {
-    return "sent-to-production";
-  }
-
-  return status ?? "pending";
 }
 
 export function normalizePrintifyOrder(
@@ -101,6 +66,14 @@ export function normalizePrintifyOrder(
     referenceOrderId: null,
     shopId,
     status: payload.status ?? "pending",
+    sentToProductionAt: asIso(payload.sent_to_production_at),
+    totalCost:
+      typeof payload.total_price === "number"
+        ? {
+            amount: payload.total_price,
+            currency: payload.currency ?? "USD"
+          }
+        : null,
     createdAt: asIso(payload.created_at),
     updatedAt: asIso(payload.updated_at),
     customer: {
@@ -135,21 +108,6 @@ export function normalizePrintifyOrder(
     providerUrl: null,
     etaMinAt: null,
     etaMaxAt: null,
-    raw: payload
-  };
-}
-
-export function normalizePrintifyWebhook(
-  payload: PrintifyWebhookPayload
-): NormalizedOrderEvent {
-  return {
-    provider: "printify",
-    eventId: payload.id,
-    orderId: payload.resource.id,
-    referenceOrderId: null,
-    status: statusFromWebhook(payload.type, payload.resource.data?.status),
-    occurredAt: asIso(payload.created_at),
-    comment: null,
     raw: payload
   };
 }

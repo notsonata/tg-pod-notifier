@@ -10,8 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "printify:webhooks": "tsx scripts/register-printify-webhooks.ts"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "better-sqlite3": "^11.8.1",

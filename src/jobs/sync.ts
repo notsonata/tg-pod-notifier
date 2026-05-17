@@ -6,10 +6,26 @@ export interface RefreshSummary {
   printifyOrders: number;
   gelatoOrders: number;
   printifyShopSelected: boolean;
-  newlyFulfilled: Array<{
+  orderDetailsNotifications: Array<{
     provider: "printify" | "gelato";
     externalOrderId: string;
   }>;
+}
+
+const PROBLEM_STATUSES = new Set([
+  "has-issues",
+  "error",
+  "failed",
+  "payment-not-received",
+  "out-of-stock",
+  "shipping-issue",
+  "exception",
+  "return-to-sender",
+  "returned"
+]);
+
+function isProblemStatus(status: string): boolean {
+  return PROBLEM_STATUSES.has(status.trim().toLowerCase().replace(/\s+/g, "-"));
 }
 
 export async function refreshAllOrders(deps: {
@@ -20,7 +36,7 @@ export async function refreshAllOrders(deps: {
   const { repository, printify, gelato } = deps;
   let printifyOrders = 0;
   let gelatoOrders = 0;
-  const newlyFulfilled: RefreshSummary["newlyFulfilled"] = [];
+  const orderDetailsNotifications: RefreshSummary["orderDetailsNotifications"] = [];
 
   const shopId = await repository.getSelectedPrintifyShopId();
   if (shopId) {
@@ -28,12 +44,8 @@ export async function refreshAllOrders(deps: {
     printifyOrders = orders.length;
     for (const order of orders) {
       const result = await repository.upsertOrder(order, "poll");
-      if (
-        result.statusChanged &&
-        result.currentStatus.toLowerCase() === "fulfilled" &&
-        result.previousStatus?.toLowerCase() !== "fulfilled"
-      ) {
-        newlyFulfilled.push({
+      if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
+        orderDetailsNotifications.push({
           provider: order.provider,
           externalOrderId: order.externalOrderId
         });
@@ -48,12 +60,8 @@ export async function refreshAllOrders(deps: {
       ? await gelato.getOrderStatus(order.referenceOrderId)
       : await gelato.getOrder(order.externalOrderId);
     const result = await repository.upsertOrder(refreshed, "poll");
-    if (
-      result.statusChanged &&
-      result.currentStatus.toLowerCase() === "fulfilled" &&
-      result.previousStatus?.toLowerCase() !== "fulfilled"
-    ) {
-      newlyFulfilled.push({
+    if (result.isNew || (result.statusChanged && isProblemStatus(result.currentStatus))) {
+      orderDetailsNotifications.push({
         provider: refreshed.provider,
         externalOrderId: refreshed.externalOrderId
       });
@@ -64,6 +72,6 @@ export async function refreshAllOrders(deps: {
     printifyOrders,
     gelatoOrders,
     printifyShopSelected: Boolean(shopId),
-    newlyFulfilled
+    orderDetailsNotifications
   };
 }

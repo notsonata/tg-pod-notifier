@@ -1,7 +1,5 @@
 export type ProviderName = "gelato" | "printify";
 
-export type AlertSeverity = "warning" | "critical" | "success";
-
 export interface TrackingLink {
   carrier: string | null;
   trackingNumber: string;
@@ -34,6 +32,11 @@ export interface NormalizedOrder {
   referenceOrderId: string | null;
   shopId: string | null;
   status: string;
+  sentToProductionAt: string | null;
+  totalCost: {
+    amount: number;
+    currency: string;
+  } | null;
   createdAt: string | null;
   updatedAt: string | null;
   customer: NormalizedCustomer;
@@ -45,44 +48,11 @@ export interface NormalizedOrder {
   raw: unknown;
 }
 
-export interface NormalizedOrderEvent {
-  provider: ProviderName;
-  eventId: string;
-  orderId: string;
-  referenceOrderId: string | null;
-  status: string;
-  occurredAt: string | null;
-  comment: string | null;
-  raw: unknown;
-}
-
-export interface AlertThresholds {
-  nowIso: string;
-  staleDays: number;
-}
-
-export interface AlertDecision {
-  severity: AlertSeverity;
-  reason: "stale-order" | "delayed-order";
-  message: string;
-}
-
 export interface BotSettings {
   telegramChatId: string;
   printifyShopId: string | null;
   printifyShopName: string | null;
   timezone: string;
   digestEnabled: boolean;
-  digestHour: number;
-  digestMinute: number;
-  digestStatuses: string[];
-  digestStuckOnly: boolean;
-  piiName: boolean;
-  piiEmail: boolean;
-  piiPhone: boolean;
-  piiAddress: boolean;
-  thresholds: {
-    staleDays: number;
-  };
   lastDigestSentAt: string | null;
 }
