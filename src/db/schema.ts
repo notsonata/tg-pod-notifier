@@ -52,6 +52,21 @@ export const statusEvents = sqliteTable("status_events", {
   rawJson: text("raw_json").notNull()
 });
 
+export const orderRiskEvents = sqliteTable("order_risk_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  orderUniqueKey: text("order_unique_key").notNull(),
+  provider: text("provider").notNull(),
+  externalOrderId: text("external_order_id").notNull(),
+  riskType: text("risk_type").notNull(),
+  severity: text("severity").notNull(),
+  reason: text("reason").notNull(),
+  expectedShipAt: text("expected_ship_at"),
+  firstDetectedAt: text("first_detected_at").notNull(),
+  lastDetectedAt: text("last_detected_at").notNull(),
+  lastAlertedAt: text("last_alerted_at"),
+  resolvedAt: text("resolved_at")
+});
+
 export const settings = sqliteTable("settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   telegramChatId: text("telegram_chat_id").notNull().unique(),

@@ -16,6 +16,11 @@ import {
   providerKeysKeyboard
 } from "./keyboards.js";
 import {
+  detectProductionRisk,
+  renderProductionRiskAlert,
+  type ProductionRisk,
+} from "../jobs/production-risk.js";
+import {
   renderDigest,
   renderOrderDetails,
   renderOrderSummary
@@ -339,21 +344,47 @@ export function createTelegramBot(deps: {
     });
 
     const settings = await repository.ensureSettings();
+    const stores = await storeNameMap(repository);
+    const riskOrderKeys = new Set<string>();
+    const openOrders = await repository.listOpenOrders();
+    for (const order of openOrders) {
+      const risk = detectProductionRisk(order);
+      if (!risk) {
+        await repository.resolveProductionRisks(`${order.provider}:${order.externalOrderId}`);
+        continue;
+      }
+      riskOrderKeys.add(`${order.provider}:${order.externalOrderId}`);
+      const result = await repository.upsertProductionRisk(risk);
+      if (result.shouldAlert) {
+        await sendProductionRiskAlert(bot, settings.telegramChatId, order, result.risk, stores);
+      }
+    }
+
     for (const notification of summary.orderDetailsNotifications) {
+      if (riskOrderKeys.has(`${notification.provider}:${notification.externalOrderId}`)) {
+        continue;
+      }
       const order = await repository.getOrder(notification.provider, notification.externalOrderId);
       if (order) {
+        const risk = detectProductionRisk(order);
+        if (risk) {
+          const result = await repository.upsertProductionRisk(risk);
+          if (result.shouldAlert) {
+            await sendProductionRiskAlert(bot, settings.telegramChatId, order, result.risk, stores);
+          }
+          continue;
+        }
         await sendOrderAlert(
           bot,
           settings.telegramChatId,
           order,
           settings,
-          await storeNameMap(repository)
+          stores
         );
       }
     }
-    const openOrders = await repository.listOpenOrders();
     const changes = await repository.listRecentStatusEvents(settings.lastDigestSentAt);
-    await ctx.editMessageText(renderDigest(openOrders, changes, settings, await storeNameMap(repository)), {
+    await ctx.editMessageText(renderDigest(openOrders, changes, settings, stores), {
       parse_mode: "HTML",
       reply_markup: ordersKeyboard(openOrders)
     });
@@ -414,5 +445,18 @@ export async function sendDigest(
   await bot.api.sendMessage(chatId, renderDigest(orders, changes, settings, storeNames), {
     parse_mode: "HTML",
     reply_markup: orders.length > 0 ? ordersKeyboard(orders) : undefined
+  });
+}
+
+export async function sendProductionRiskAlert(
+  bot: Bot,
+  chatId: string,
+  order: NormalizedOrder,
+  risk: ProductionRisk,
+  storeNames: Record<string, string> = {}
+) {
+  await bot.api.sendMessage(chatId, renderProductionRiskAlert(order, risk, storeNames), {
+    parse_mode: "HTML",
+    reply_markup: orderKeyboard(order)
   });
 }

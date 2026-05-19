@@ -258,6 +258,29 @@ View Details
 
 `Open Provider` only appears when a provider URL is available.
 
+### Production Risk Alert
+
+```text
+⚠️⚠️ Production risk
+
+<provider icon> <Provider>
+🏬 <store name>
+
+📦 Order: <copyable order id>
+📥 Order received: <date|Pending>
+🏭 Sent to production: <date|Pending>
+📍 Status: <status>
+
+⚠️ Risk: <risk reason>
+⏱️ Risk age: <duration>
+📅 Expected ship date: <date|Unavailable>
+
+👤 Customer: <customer name|Unknown>
+💵 Total cost: <amount|Pending>
+
+🚚 Tracking: <tracking|Pending>
+```
+
 ### Digest Settings
 
 ```text

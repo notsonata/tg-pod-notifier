@@ -63,6 +63,20 @@ export function createDatabase(databasePath: string) {
       occurred_at TEXT,
       raw_json TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS order_risk_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_unique_key TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      external_order_id TEXT NOT NULL,
+      risk_type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      expected_ship_at TEXT,
+      first_detected_at TEXT NOT NULL,
+      last_detected_at TEXT NOT NULL,
+      last_alerted_at TEXT,
+      resolved_at TEXT
+    );
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       telegram_chat_id TEXT NOT NULL UNIQUE,

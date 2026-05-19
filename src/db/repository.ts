@@ -9,8 +9,9 @@ import type {
   ProviderStoreConfig
 } from "../domain/types.js";
 import { isHiddenOrderStatus } from "../domain/types.js";
+import type { ProductionRisk } from "../jobs/production-risk.js";
 import type { AppDatabase } from "./client.js";
-import { orderItems, orders, providerKeys, providerStores, settings, statusEvents } from "./schema.js";
+import { orderItems, orderRiskEvents, orders, providerKeys, providerStores, settings, statusEvents } from "./schema.js";
 
 function orderUniqueKey(order: Pick<NormalizedOrder, "provider" | "externalOrderId">): string {
   return `${order.provider}:${order.externalOrderId}`;
@@ -501,6 +502,60 @@ export class Repository {
     });
 
     return mapOrderRow(row, itemRows);
+  }
+
+  async upsertProductionRisk(risk: ProductionRisk): Promise<{ shouldAlert: boolean; risk: ProductionRisk }> {
+    const existing = await this.db.query.orderRiskEvents.findFirst({
+      where: and(
+        eq(orderRiskEvents.orderUniqueKey, risk.orderUniqueKey),
+        eq(orderRiskEvents.riskType, risk.riskType),
+        sql`${orderRiskEvents.resolvedAt} IS NULL`
+      )
+    });
+
+    if (!existing) {
+      await this.db.insert(orderRiskEvents).values({
+        orderUniqueKey: risk.orderUniqueKey,
+        provider: risk.provider,
+        externalOrderId: risk.externalOrderId,
+        riskType: risk.riskType,
+        severity: risk.severity,
+        reason: risk.reason,
+        expectedShipAt: risk.expectedShipAt,
+        firstDetectedAt: risk.detectedAt,
+        lastDetectedAt: risk.detectedAt,
+        lastAlertedAt: risk.detectedAt,
+        resolvedAt: null
+      });
+      return { shouldAlert: true, risk };
+    }
+
+    const severityChanged = existing.severity !== risk.severity || existing.reason !== risk.reason;
+    await this.db
+      .update(orderRiskEvents)
+      .set({
+        severity: risk.severity,
+        reason: risk.reason,
+        expectedShipAt: risk.expectedShipAt,
+        lastDetectedAt: risk.detectedAt,
+        lastAlertedAt: severityChanged ? risk.detectedAt : existing.lastAlertedAt
+      })
+      .where(eq(orderRiskEvents.id, existing.id));
+
+    return {
+      shouldAlert: severityChanged,
+      risk: {
+        ...risk,
+        detectedAt: existing.firstDetectedAt
+      }
+    };
+  }
+
+  async resolveProductionRisks(orderUniqueKeyValue: string, resolvedAt = new Date().toISOString()): Promise<void> {
+    await this.db
+      .update(orderRiskEvents)
+      .set({ resolvedAt })
+      .where(and(eq(orderRiskEvents.orderUniqueKey, orderUniqueKeyValue), sql`${orderRiskEvents.resolvedAt} IS NULL`));
   }
 
   async listRecentStatusEvents(sinceIso: string | null): Promise<Array<{ orderUniqueKey: string; status: string; occurredAt: string | null }>> {
