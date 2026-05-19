@@ -407,33 +407,35 @@ export class Repository {
     const existing = await this.db.query.orders.findFirst({
       where: eq(orders.uniqueKey, uniqueKey)
     });
+    const existingRaw = existing ? rawObject(JSON.parse(existing.rawJson)) : {};
+    const incomingRaw = rawObject(order.raw);
 
     const payload = {
       provider: order.provider,
       externalOrderId: order.externalOrderId,
-      displayOrderId: order.displayOrderId,
-      referenceOrderId: order.referenceOrderId,
-      shopId: order.shopId,
+      displayOrderId: order.displayOrderId ?? existing?.displayOrderId ?? null,
+      referenceOrderId: order.referenceOrderId ?? existing?.referenceOrderId ?? null,
+      shopId: order.shopId ?? existing?.shopId ?? null,
       status: order.status,
-      sentToProductionAt: order.sentToProductionAt,
-      totalCostAmount: order.totalCost?.amount ?? null,
-      totalCostCurrency: order.totalCost?.currency ?? null,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-      customerName: order.customer.name,
-      city: order.customer.city,
-      region: order.customer.region,
-      country: order.customer.country,
-      email: order.customer.email,
-      phone: order.customer.phone,
-      address1: order.customer.address1,
-      address2: order.customer.address2,
-      postalCode: order.customer.postalCode,
+      sentToProductionAt: order.sentToProductionAt ?? existing?.sentToProductionAt ?? null,
+      totalCostAmount: order.totalCost?.amount ?? existing?.totalCostAmount ?? null,
+      totalCostCurrency: order.totalCost?.currency ?? existing?.totalCostCurrency ?? null,
+      createdAt: order.createdAt ?? existing?.createdAt ?? null,
+      updatedAt: order.updatedAt ?? existing?.updatedAt ?? null,
+      customerName: order.customer.name ?? existing?.customerName ?? null,
+      city: order.customer.city ?? existing?.city ?? null,
+      region: order.customer.region ?? existing?.region ?? null,
+      country: order.customer.country ?? existing?.country ?? null,
+      email: order.customer.email ?? existing?.email ?? null,
+      phone: order.customer.phone ?? existing?.phone ?? null,
+      address1: order.customer.address1 ?? existing?.address1 ?? null,
+      address2: order.customer.address2 ?? existing?.address2 ?? null,
+      postalCode: order.customer.postalCode ?? existing?.postalCode ?? null,
       trackingLinksJson: JSON.stringify(order.trackingLinks),
-      providerUrl: order.providerUrl,
-      etaMinAt: order.etaMinAt,
-      etaMaxAt: order.etaMaxAt,
-      rawJson: JSON.stringify(order.raw),
+      providerUrl: order.providerUrl ?? existing?.providerUrl ?? null,
+      etaMinAt: order.etaMinAt ?? existing?.etaMinAt ?? null,
+      etaMaxAt: order.etaMaxAt ?? existing?.etaMaxAt ?? null,
+      rawJson: JSON.stringify({ ...existingRaw, ...incomingRaw }),
       uniqueKey
     };
 

@@ -108,6 +108,57 @@ function totalCost(payload: GelatoOrderPayload): NormalizedOrder["totalCost"] {
   return null;
 }
 
+function trackingLinks(payload: GelatoOrderPayload): NormalizedOrder["trackingLinks"] {
+  const items = payload.items ?? payload.orderItems ?? [];
+  const links = [
+    ...items.flatMap((item) =>
+      (item.trackingCode ?? [])
+        .filter((tracking) => Boolean(tracking.trackingCode))
+        .map((tracking) => ({
+          carrier: null,
+          trackingNumber: tracking.trackingCode ?? "",
+          trackingUrl: tracking.trackingUrl ?? null
+        }))
+    ),
+    ...(payload.shipment?.packages ?? [])
+      .filter((tracking) => Boolean(tracking.trackingCode))
+      .map((tracking) => ({
+        carrier: null,
+        trackingNumber: tracking.trackingCode ?? "",
+        trackingUrl: tracking.trackingUrl ?? null
+      }))
+  ];
+
+  return Array.from(
+    new Map(links.map((link) => [`${link.trackingNumber}:${link.trackingUrl ?? ""}`, link])).values()
+  );
+}
+
+function mergeGelatoPayloads(
+  base: GelatoOrderPayload,
+  override: GelatoOrderPayload
+): GelatoOrderPayload {
+  return {
+    ...base,
+    ...override,
+    orderedAt: override.orderedAt ?? base.orderedAt,
+    createdAt: override.createdAt ?? base.createdAt,
+    updatedAt: override.updatedAt ?? base.updatedAt,
+    storeId: override.storeId ?? base.storeId,
+    currency: override.currency ?? base.currency,
+    totalInclVat: override.totalInclVat ?? base.totalInclVat,
+    firstName: override.firstName ?? base.firstName,
+    lastName: override.lastName ?? base.lastName,
+    country: override.country ?? base.country,
+    shippingAddress: override.shippingAddress ?? base.shippingAddress,
+    recipient: override.recipient ?? base.recipient,
+    receipts: override.receipts ?? base.receipts,
+    shipment: override.shipment ?? base.shipment,
+    items: override.items ?? base.items,
+    orderItems: override.orderItems ?? base.orderItems
+  };
+}
+
 export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrder {
   const address = payload.shippingAddress ?? payload.recipient;
   const status = payload.fulfillmentStatus ?? payload.productionStatus ?? "created";
@@ -144,25 +195,7 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
         quantity: item.quantity ?? 1,
         status: item.status ?? item.fulfillmentStatus ?? status
       })),
-    trackingLinks:
-      [
-        ...items.flatMap((item) =>
-          (item.trackingCode ?? [])
-            .filter((tracking) => Boolean(tracking.trackingCode))
-            .map((tracking) => ({
-              carrier: null,
-              trackingNumber: tracking.trackingCode ?? "",
-              trackingUrl: tracking.trackingUrl ?? null
-            }))
-        ),
-        ...(payload.shipment?.packages ?? [])
-          .filter((tracking) => Boolean(tracking.trackingCode))
-          .map((tracking) => ({
-            carrier: null,
-            trackingNumber: tracking.trackingCode ?? "",
-            trackingUrl: tracking.trackingUrl ?? null
-          }))
-      ],
+    trackingLinks: trackingLinks(payload),
     providerUrl: null,
     etaMinAt: null,
     etaMaxAt: null,
@@ -195,12 +228,28 @@ export class GelatoClient {
   }
 
   async getOrder(orderId: string): Promise<NormalizedOrder> {
-    const payload = await this.request<GelatoOrderPayload>(`/v4/orders/${orderId}`);
+    const payload = await this.getOrderPayload(orderId);
     const normalized = normalizeGelatoOrder(payload);
     return {
       ...normalized,
       shopId: normalized.shopId ?? this.storeId
     };
+  }
+
+  private async getOrderPayload(orderId: string): Promise<GelatoOrderPayload> {
+    try {
+      return await this.request<GelatoOrderPayload>(`/v4/orders/${orderId}`);
+    } catch {
+      const payload = await this.searchOrders(100);
+      const match = (payload.orders ?? []).find(
+        (order) => order.id === orderId || order.orderReferenceId === orderId
+      );
+      if (!match?.id) {
+        throw new Error(`Gelato order not found: ${orderId}`);
+      }
+      const detail = await this.request<GelatoOrderPayload>(`/v4/orders/${match.id}`);
+      return mergeGelatoPayloads(match, detail);
+    }
   }
 
   async getOrderStatus(orderReferenceId: string): Promise<NormalizedOrder> {
@@ -215,14 +264,7 @@ export class GelatoClient {
   }
 
   async listOrders(): Promise<NormalizedOrder[]> {
-    const payload = await this.request<{ orders?: GelatoOrderPayload[] }>("/v4/orders:search", {
-      method: "POST",
-      body: JSON.stringify({
-        orderTypes: ["order"],
-        storeIds: [this.storeId],
-        limit: 100
-      })
-    });
+    const payload = await this.searchOrders(100);
 
     return Promise.all(
       (payload.orders ?? []).map(async (order) => {
@@ -230,7 +272,11 @@ export class GelatoClient {
         const detailLookupId = normalized.externalOrderId;
 
         try {
-          return await this.getOrder(detailLookupId);
+          const detail = await this.getOrderPayload(detailLookupId);
+          return {
+            ...normalizeGelatoOrder(mergeGelatoPayloads(order, detail)),
+            shopId: detail.storeId ?? order.storeId ?? this.storeId
+          };
         } catch {
           return {
             ...normalized,
@@ -239,5 +285,16 @@ export class GelatoClient {
         }
       })
     );
+  }
+
+  private searchOrders(limit: number): Promise<{ orders?: GelatoOrderPayload[] }> {
+    return this.request<{ orders?: GelatoOrderPayload[] }>("/v4/orders:search", {
+      method: "POST",
+      body: JSON.stringify({
+        orderTypes: ["order"],
+        storeIds: [this.storeId],
+        limit
+      })
+    });
   }
 }

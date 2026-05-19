@@ -117,4 +117,47 @@ describe("Gelato normalization", () => {
     ]);
   });
 
+  test("deduplicates tracking links shared by items and shipment packages", () => {
+    const normalized = normalizeGelatoOrder({
+      id: "84edbc9d-2fef-4ac1-a79b-a4f0a3236241",
+      orderReferenceId: "4059362517",
+      fulfillmentStatus: "in_transit",
+      items: [
+        {
+          itemReferenceId: "5060794426",
+          trackingCode: [
+            {
+              trackingCode: "1ZE93448YW93849145",
+              trackingUrl: "https://tracking.example/ups"
+            }
+          ]
+        },
+        {
+          itemReferenceId: "branded-insert",
+          trackingCode: [
+            {
+              trackingCode: "1ZE93448YW93849145",
+              trackingUrl: "https://tracking.example/ups"
+            }
+          ]
+        }
+      ],
+      shipment: {
+        packages: [
+          {
+            trackingCode: "1ZE93448YW93849145",
+            trackingUrl: "https://tracking.example/ups"
+          }
+        ]
+      }
+    });
+
+    expect(normalized.trackingLinks).toEqual([
+      {
+        carrier: null,
+        trackingNumber: "1ZE93448YW93849145",
+        trackingUrl: "https://tracking.example/ups"
+      }
+    ]);
+  });
 });
