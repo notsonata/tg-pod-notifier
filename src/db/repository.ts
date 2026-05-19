@@ -74,6 +74,23 @@ function statusFromRaw(row: typeof orders.$inferSelect, raw: unknown): string {
   return row.status;
 }
 
+function orderReceivedAtFromRaw(row: typeof orders.$inferSelect, raw: unknown): string | null {
+  if (raw && typeof raw === "object") {
+    const payload = raw as Record<string, unknown>;
+    if (row.provider === "gelato" && typeof payload.orderedAt === "string") {
+      return payload.orderedAt;
+    }
+    if (typeof payload.created_at === "string") {
+      return payload.created_at;
+    }
+    if (typeof payload.createdAt === "string") {
+      return payload.createdAt;
+    }
+  }
+
+  return row.createdAt;
+}
+
 function customerNameFromRaw(row: typeof orders.$inferSelect, raw: unknown): string | null {
   if (row.customerName) {
     return row.customerName;
@@ -146,6 +163,7 @@ function mapOrderRow(
     shopId: row.shopId,
     status: statusFromRaw(row, raw),
     sentToProductionAt: row.sentToProductionAt,
+    orderReceivedAt: orderReceivedAtFromRaw(row, raw),
     totalCost:
       row.totalCostAmount !== null && row.totalCostCurrency
         ? {
@@ -211,6 +229,7 @@ export class Repository {
       telegramChatId: row.telegramChatId,
       timezone: row.timezone,
       digestEnabled: row.digestEnabled,
+      digestOnlyOnUpdates: row.digestOnlyOnUpdates,
       lastDigestSentAt: row.lastDigestSentAt
     };
   }
@@ -222,6 +241,7 @@ export class Repository {
       .set({
         timezone: partial.timezone ?? current.timezone,
         digestEnabled: partial.digestEnabled ?? current.digestEnabled,
+        digestOnlyOnUpdates: partial.digestOnlyOnUpdates ?? current.digestOnlyOnUpdates,
         lastDigestSentAt: partial.lastDigestSentAt ?? current.lastDigestSentAt
       })
       .where(eq(settings.telegramChatId, this.config.AUTHORIZED_TELEGRAM_CHAT_ID));

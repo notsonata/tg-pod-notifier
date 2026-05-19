@@ -9,6 +9,7 @@ describe("Gelato normalization", () => {
       orderReferenceId: "merchant-1",
       fulfillmentStatus: "in_production",
       orderType: "order",
+      orderedAt: "2025-01-01T00:30:00.000Z",
       createdAt: "2025-01-01T00:00:00.000Z",
       updatedAt: "2025-01-01T02:00:00.000Z",
       orderItems: [
@@ -40,6 +41,7 @@ describe("Gelato normalization", () => {
     expect(normalized.externalOrderId).toBe("gelato-order-1");
     expect(normalized.displayOrderId).toBe("merchant-1");
     expect(normalized.referenceOrderId).toBe("merchant-1");
+    expect(normalized.orderReceivedAt).toBe("2025-01-01T00:30:00.000Z");
     expect(normalized.sentToProductionAt).toBeNull();
     expect(normalized.totalCost).toBeNull();
     expect(normalized.items[0]?.status).toBe("printed");

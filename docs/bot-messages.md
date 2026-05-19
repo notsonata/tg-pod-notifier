@@ -263,6 +263,8 @@ View Details
 ```text
 📋 Disable digest
 📋 Enable digest
+⬜ Enable digest only on new updates
+✅ Enable digest only on new updates
 ```
 
 ### General Settings

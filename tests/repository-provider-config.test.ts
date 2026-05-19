@@ -61,6 +61,25 @@ describe("provider configuration repository", () => {
     ]);
   });
 
+  test("stores digest update-only setting", async () => {
+    const repository = makeRepository();
+
+    await expect(repository.ensureSettings()).resolves.toMatchObject({
+      digestEnabled: true,
+      digestOnlyOnUpdates: false
+    });
+
+    await expect(
+      repository.updateSettings({
+        digestEnabled: true,
+        digestOnlyOnUpdates: true
+      })
+    ).resolves.toMatchObject({
+      digestEnabled: true,
+      digestOnlyOnUpdates: true
+    });
+  });
+
   test("stores Gelato key and manually named stores", async () => {
     const repository = makeRepository();
     const key = await repository.saveProviderKey("gelato", "Gelato Main", "gelato-token");
@@ -94,6 +113,7 @@ describe("provider configuration repository", () => {
       shopId: "13091824",
       status: "fulfilled",
       sentToProductionAt: null,
+      orderReceivedAt: "2026-03-28T08:43:57.000Z",
       totalCost: null,
       createdAt: "2026-03-28T08:43:57.000Z",
       updatedAt: "2026-03-28T08:43:57.000Z",
@@ -147,6 +167,7 @@ describe("provider configuration repository", () => {
       shopId: "gelato-store-1",
       status: "shipped",
       sentToProductionAt: null,
+      orderReceivedAt: "2026-05-12T18:12:50+00:00",
       totalCost: null,
       createdAt: "2026-05-11T01:06:46.000Z",
       updatedAt: "2026-05-14T17:22:03.000Z",
@@ -169,6 +190,7 @@ describe("provider configuration repository", () => {
       raw: {
         id: "45e8d98e-ba22-4e0c-93ae-26bf78f61ca2",
         orderReferenceId: "4059882153",
+        orderedAt: "2026-05-12T18:12:50+00:00",
         fulfillmentStatus: "in_transit",
         shippingAddress: {
           firstName: "Terry",
@@ -193,7 +215,8 @@ describe("provider configuration repository", () => {
           region: "Tokyo",
           country: "JP",
           postalCode: "100-0001"
-        }
+        },
+        orderReceivedAt: "2026-05-12T18:12:50+00:00"
       }
     ]);
   });
@@ -208,6 +231,7 @@ describe("provider configuration repository", () => {
       shopId: "gelato-store-1",
       status: "shipped",
       sentToProductionAt: null,
+      orderReceivedAt: "2026-04-23T21:01:59+00:00",
       totalCost: null,
       createdAt: "2026-04-21T21:08:52.000Z",
       updatedAt: "2026-04-29T12:10:37.000Z",
@@ -230,6 +254,7 @@ describe("provider configuration repository", () => {
       raw: {
         id: "ed555091-bb39-4cdf-8c3a-522c231da603",
         orderReferenceId: "4045043775",
+        orderedAt: "2026-04-23T21:01:59+00:00",
         fulfillmentStatus: "delivered",
         shippingAddress: {
           firstName: "Charbonnier"

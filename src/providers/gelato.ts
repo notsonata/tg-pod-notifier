@@ -38,6 +38,7 @@ interface GelatoOrderPayload {
   fulfillmentStatus?: string;
   productionStatus?: string;
   orderType?: string;
+  orderedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   storeId?: string | null;
@@ -120,6 +121,7 @@ export function normalizeGelatoOrder(payload: GelatoOrderPayload): NormalizedOrd
     shopId: payload.storeId ?? null,
     status,
     sentToProductionAt: null,
+    orderReceivedAt: asIso(payload.orderedAt ?? payload.createdAt),
     totalCost: totalCost(payload),
     createdAt: asIso(payload.createdAt),
     updatedAt: asIso(payload.updatedAt),

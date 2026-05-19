@@ -7,6 +7,7 @@ const settings: BotSettings = {
   telegramChatId: "-1001",
   timezone: "UTC",
   digestEnabled: true,
+  digestOnlyOnUpdates: false,
   lastDigestSentAt: null
 };
 
@@ -18,6 +19,7 @@ const order: NormalizedOrder = {
   shopId: "13091824",
   status: "fulfilled",
   sentToProductionAt: "2026-05-10T00:00:00.000Z",
+  orderReceivedAt: "2026-04-07T16:14:35.000Z",
   totalCost: {
     amount: 5788,
     currency: "USD"
@@ -52,6 +54,7 @@ describe("renderOrderDetails", () => {
       "🏬 Peddlex",
       "",
       "📦 Order: <code>4052650188</code>",
+      "📥 Order received: Tue, Apr 07",
       "🏭 Sent to production: Sun, May 10",
       "",
       "👤 Customer: Jordan Larkin",

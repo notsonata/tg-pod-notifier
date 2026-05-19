@@ -34,6 +34,7 @@ export interface NormalizedOrder {
   shopId: string | null;
   status: string;
   sentToProductionAt: string | null;
+  orderReceivedAt: string | null;
   totalCost: {
     amount: number;
     currency: string;
@@ -63,6 +64,7 @@ export interface BotSettings {
   telegramChatId: string;
   timezone: string;
   digestEnabled: boolean;
+  digestOnlyOnUpdates: boolean;
   lastDigestSentAt: string | null;
 }
 

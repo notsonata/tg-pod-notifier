@@ -31,7 +31,12 @@ export function orderKeyboard(order: NormalizedOrder): InlineKeyboard {
 
 export function digestSettingsKeyboard(settings: BotSettings): InlineKeyboard {
   return new InlineKeyboard()
-    .text(settings.digestEnabled ? "📋 Disable digest" : "📋 Enable digest", "settings:digest:toggle");
+    .text(settings.digestEnabled ? "📋 Disable digest" : "📋 Enable digest", "settings:digest:toggle")
+    .row()
+    .text(
+      `${settings.digestOnlyOnUpdates ? "✅" : "⬜"} Enable digest only on new updates`,
+      "settings:digest:updates-only"
+    );
 }
 
 export function generalSettingsKeyboard(settings: BotSettings): InlineKeyboard {

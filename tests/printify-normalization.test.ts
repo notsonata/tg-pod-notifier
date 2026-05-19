@@ -61,6 +61,7 @@ describe("Printify normalization", () => {
     expect(normalized.provider).toBe("printify");
     expect(normalized.externalOrderId).toBe("order-1");
     expect(normalized.displayOrderId).toBe("order-1");
+    expect(normalized.orderReceivedAt).toBe("2025-01-01T00:00:00.000Z");
     expect(normalized.sentToProductionAt).toBe("2025-01-01T02:00:00.000Z");
     expect(normalized.totalCost).toEqual({
       amount: 2500,

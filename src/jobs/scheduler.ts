@@ -47,7 +47,9 @@ export function startScheduler(deps: {
         stores.map((store) => [store.externalStoreId, store.name])
       );
 
-      await sendDigest(bot, currentSettings.telegramChatId, openOrders, changes, currentSettings, storeNames);
+      if (!currentSettings.digestOnlyOnUpdates || changes.length > 0) {
+        await sendDigest(bot, currentSettings.telegramChatId, openOrders, changes, currentSettings, storeNames);
+      }
       await repository.updateSettings({ lastDigestSentAt: new Date().toISOString() });
     }
   });

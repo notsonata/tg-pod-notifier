@@ -134,6 +134,7 @@ export function renderOrderDetails(
     `🏬 ${htmlEscape(order.shopId ? storeNames[order.shopId] ?? order.shopId : "Unknown")}`,
     "",
     `📦 Order: ${copyable(orderDisplayId(order))}`,
+    `📥 Order received: ${formatProductionDate(order.orderReceivedAt)}`,
     `🏭 Sent to production: ${formatProductionDate(order.sentToProductionAt)}`,
     "",
     `👤 Customer: ${htmlEscape(order.customer.name ?? "Unknown")}`,

@@ -316,6 +316,17 @@ export function createTelegramBot(deps: {
     });
   });
 
+  bot.callbackQuery(/^settings:digest:updates-only$/, async (ctx) => {
+    const current = await repository.ensureSettings();
+    const updated = await repository.updateSettings({
+      digestEnabled: true,
+      digestOnlyOnUpdates: !current.digestOnlyOnUpdates
+    });
+    await ctx.editMessageText("Digest settings", {
+      reply_markup: digestSettingsKeyboard(updated)
+    });
+  });
+
   bot.callbackQuery(/^noop:provider$/, async (ctx) => {
     await ctx.answerCallbackQuery({
       text: "📍 Provider link is not available for this order."

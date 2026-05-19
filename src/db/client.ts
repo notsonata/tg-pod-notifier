@@ -68,6 +68,7 @@ export function createDatabase(databasePath: string) {
       telegram_chat_id TEXT NOT NULL UNIQUE,
       timezone TEXT NOT NULL,
       digest_enabled INTEGER NOT NULL DEFAULT 1,
+      digest_only_on_updates INTEGER NOT NULL DEFAULT 0,
       last_digest_sent_at TEXT
     );
     CREATE TABLE IF NOT EXISTS provider_keys (
@@ -115,6 +116,14 @@ export function createDatabase(databasePath: string) {
 
   try {
     sqlite.exec(`ALTER TABLE orders ADD COLUMN total_cost_currency TEXT;`);
+  } catch (error) {
+    if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
+      throw error;
+    }
+  }
+
+  try {
+    sqlite.exec(`ALTER TABLE settings ADD COLUMN digest_only_on_updates INTEGER NOT NULL DEFAULT 0;`);
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes("duplicate column name")) {
       throw error;

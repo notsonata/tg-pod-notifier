@@ -99,6 +99,7 @@ export function normalizePrintifyOrder(
     shopId,
     status,
     sentToProductionAt: asIso(payload.sent_to_production_at),
+    orderReceivedAt: asIso(payload.created_at),
     totalCost:
       typeof payload.total_price === "number"
         ? {

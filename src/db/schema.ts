@@ -57,6 +57,7 @@ export const settings = sqliteTable("settings", {
   telegramChatId: text("telegram_chat_id").notNull().unique(),
   timezone: text("timezone").notNull(),
   digestEnabled: integer("digest_enabled", { mode: "boolean" }).notNull().default(true),
+  digestOnlyOnUpdates: integer("digest_only_on_updates", { mode: "boolean" }).notNull().default(false),
   lastDigestSentAt: text("last_digest_sent_at")
 });
 
