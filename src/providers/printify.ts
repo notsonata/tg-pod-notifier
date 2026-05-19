@@ -80,6 +80,17 @@ function shipmentIsDelivered(shipment: PrintifyShipment & { delivered_at?: strin
   return Boolean(shipment.delivered_at) || shipment.status?.toLowerCase() === "delivered";
 }
 
+function totalCost(payload: PrintifyOrderPayload): NormalizedOrder["totalCost"] {
+  if (typeof payload.total_price !== "number" && typeof payload.total_shipping !== "number") {
+    return null;
+  }
+
+  return {
+    amount: (payload.total_price ?? 0) + (payload.total_shipping ?? 0),
+    currency: payload.currency ?? "USD"
+  };
+}
+
 export function normalizePrintifyOrder(
   payload: PrintifyOrderPayload,
   shopId: string | null = null
@@ -100,13 +111,7 @@ export function normalizePrintifyOrder(
     status,
     sentToProductionAt: asIso(payload.sent_to_production_at),
     orderReceivedAt: asIso(payload.created_at),
-    totalCost:
-      typeof payload.total_price === "number"
-        ? {
-            amount: payload.total_price,
-            currency: payload.currency ?? "USD"
-          }
-        : null,
+    totalCost: totalCost(payload),
     createdAt: asIso(payload.created_at),
     updatedAt: asIso(payload.updated_at),
     customer: {

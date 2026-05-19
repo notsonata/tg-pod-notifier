@@ -64,7 +64,7 @@ describe("Printify normalization", () => {
     expect(normalized.orderReceivedAt).toBe("2025-01-01T00:00:00.000Z");
     expect(normalized.sentToProductionAt).toBe("2025-01-01T02:00:00.000Z");
     expect(normalized.totalCost).toEqual({
-      amount: 2500,
+      amount: 3000,
       currency: "USD"
     });
     expect(normalized.items).toHaveLength(1);
